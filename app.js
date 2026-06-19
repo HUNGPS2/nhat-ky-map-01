@@ -154,6 +154,47 @@
     return (MAP_CONFIG.LAYER_COLORS && MAP_CONFIG.LAYER_COLORS[layerName]) || fallback;
   }
 
+  // Đổi link Google Drive dạng share (.../file/d/ID/view) sang dạng hiển thị ảnh trực tiếp
+  function toDirectImageURL(url) {
+    if (!url) return url;
+    const trimmed = url.trim();
+    const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+    if (driveMatch) {
+      return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+    }
+    const openMatch = trimmed.match(/drive\.google\.com\/open\?id=([^&]+)/);
+    if (openMatch) {
+      return `https://drive.google.com/uc?export=view&id=${openMatch[1]}`;
+    }
+    return trimmed;
+  }
+
+  // Parse cột AnhURLs: nhiều link cách nhau bởi ";"
+  function parseImageList(str) {
+    if (!str) return [];
+    return str
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map(toDirectImageURL);
+  }
+
+  function buildGalleryHTML(images, groupId) {
+    if (!images || images.length === 0) return "";
+    const max = MAP_CONFIG.MAX_POPUP_IMAGES || 6;
+    const shown = images.slice(0, max);
+    const encoded = encodeURIComponent(JSON.stringify(images));
+
+    const tiles = shown
+      .map(
+        (url, idx) =>
+          `<img src="${escapeHTML(url)}" data-gallery="${encoded}" data-index="${idx}" loading="lazy" alt="">`
+      )
+      .join("");
+
+    return `<div class="popup-gallery" data-group="${groupId}">${tiles}</div>`;
+  }
+
   function getOrCreateLayerEntry(layerName, kind, defaultColor) {
     if (!layerRegistry.has(layerName)) {
       layerRegistry.set(layerName, {
@@ -190,9 +231,8 @@
           fillOpacity: 0.95,
         });
 
-        const imgHtml = r.AnhURL
-          ? `<img class="popup-img" src="${escapeHTML(r.AnhURL)}" alt="">`
-          : "";
+        const images = parseImageList(r.AnhURLs || r.AnhURL);
+        const galleryHtml = buildGalleryHTML(images, "DD-" + (r.ID || layerName));
         const phoneHtml = r.SDT
           ? `<div class="popup-row"><b>Điện thoại:</b> ${escapeHTML(r.SDT)}</div>`
           : "";
@@ -207,7 +247,7 @@
           ${addrHtml}
           ${phoneHtml}
           ${descHtml}
-          ${imgHtml}
+          ${galleryHtml}
         `);
 
         entry.group.addLayer(marker);
@@ -260,6 +300,8 @@
           ? `<div class="popup-row"><b>Loại cây trồng:</b> ${escapeHTML(r.LoaiCayTrong)}</div>`
           : "";
         const descHtml = r.MoTa ? `<div class="popup-desc">${escapeHTML(r.MoTa)}</div>` : "";
+        const images = parseImageList(r.AnhURLs);
+        const galleryHtml = buildGalleryHTML(images, "VT-" + (r.ID || layerName));
 
         polygon.bindPopup(`
           <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
@@ -267,6 +309,7 @@
           ${areaHtml}
           ${cropHtml}
           ${descHtml}
+          ${galleryHtml}
         `);
 
         entry.group.addLayer(polygon);
@@ -383,6 +426,71 @@
   }
 
   els.refreshBtn.addEventListener("click", () => loadAll(false));
+
+  // ---------------------------------------------------------------
+  // Lightbox: phóng to ảnh khi click vào gallery trong popup
+  // ---------------------------------------------------------------
+  const lightbox = document.getElementById("lightbox");
+  const lbImg = document.getElementById("lb-img");
+  const lbCount = document.getElementById("lb-count");
+  const lbPrev = document.getElementById("lb-prev");
+  const lbNext = document.getElementById("lb-next");
+  const lbClose = document.getElementById("lb-close");
+
+  let currentGallery = [];
+  let currentIndex = 0;
+
+  function openLightbox(images, index) {
+    currentGallery = images;
+    currentIndex = index;
+    updateLightboxImage();
+    lightbox.classList.add("open");
+  }
+
+  function updateLightboxImage() {
+    lbImg.src = currentGallery[currentIndex];
+    lbCount.textContent = `${currentIndex + 1} / ${currentGallery.length}`;
+    const multi = currentGallery.length > 1;
+    lbPrev.style.visibility = multi ? "visible" : "hidden";
+    lbNext.style.visibility = multi ? "visible" : "hidden";
+  }
+
+  function closeLightbox() {
+    lightbox.classList.remove("open");
+    lbImg.src = "";
+  }
+
+  lbPrev.addEventListener("click", () => {
+    currentIndex = (currentIndex - 1 + currentGallery.length) % currentGallery.length;
+    updateLightboxImage();
+  });
+  lbNext.addEventListener("click", () => {
+    currentIndex = (currentIndex + 1) % currentGallery.length;
+    updateLightboxImage();
+  });
+  lbClose.addEventListener("click", closeLightbox);
+  lightbox.addEventListener("click", (e) => {
+    if (e.target === lightbox) closeLightbox();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (!lightbox.classList.contains("open")) return;
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowLeft") lbPrev.click();
+    if (e.key === "ArrowRight") lbNext.click();
+  });
+
+  // Event delegation: popup content được Leaflet tạo động nên gắn listener trên document
+  document.addEventListener("click", (e) => {
+    const img = e.target.closest("img[data-gallery]");
+    if (!img) return;
+    try {
+      const images = JSON.parse(decodeURIComponent(img.dataset.gallery));
+      const index = parseInt(img.dataset.index, 10) || 0;
+      openLightbox(images, index);
+    } catch (err) {
+      console.error("Lightbox parse error", err);
+    }
+  });
 
   // Initial load
   loadAll(true);
