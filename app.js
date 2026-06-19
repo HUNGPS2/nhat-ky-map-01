@@ -23,13 +23,55 @@
     maxZoom: 19,
   }).setView(MAP_CONFIG.DEFAULT_CENTER, MAP_CONFIG.DEFAULT_ZOOM);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 19,
-  }).addTo(map);
+  const baseLayers = {
+    "Bản đồ thường": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }),
+    "Địa hình (Terrain)": L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, ' +
+        '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+      maxZoom: 17,
+    }),
+  };
+
+  baseLayers["Bản đồ thường"].addTo(map);
 
   // layerName -> { group: L.LayerGroup, color: string, kind: 'marker'|'polygon', count: number }
   const layerRegistry = new Map();
+
+  // ---------------------------------------------------------------
+  // Basemap switcher (Bản đồ thường / Địa hình)
+  // ---------------------------------------------------------------
+  function buildBasemapPanel() {
+    const container = document.getElementById("basemap-list");
+    container.innerHTML = "";
+    let activeName = "Bản đồ thường";
+
+    Object.keys(baseLayers).forEach((name) => {
+      const row = document.createElement("label");
+      row.className = "layer-row";
+
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "basemap";
+      radio.checked = name === activeName;
+      radio.addEventListener("change", () => {
+        Object.values(baseLayers).forEach((layer) => map.removeLayer(layer));
+        baseLayers[name].addTo(map);
+      });
+
+      const lbl = document.createElement("span");
+      lbl.className = "lbl";
+      lbl.textContent = name;
+
+      row.appendChild(radio);
+      row.appendChild(lbl);
+      container.appendChild(row);
+    });
+  }
+
+  buildBasemapPanel();
 
   // ---------------------------------------------------------------
   // CSV parsing (hỗ trợ dấu phẩy trong ô được bọc bởi dấu ngoặc kép)
