@@ -1,6 +1,6 @@
-# Bản đồ vùng nguyên liệu & cơ sở CPART
+# Bản đồ vùng nguyên liệu & cơ sở BND
 
-Trang bản đồ tương tác (Leaflet) đọc dữ liệu trực tiếp từ Google Sheets, hiển thị marker (cơ sở, điểm bán) và polygon (vùng nguyên liệu, diện tích) theo lớp — giống cấu trúc map.yenduongcoop.vn.
+Trang bản đồ tương tác đọc dữ liệu trực tiếp từ Google Sheets, hiển thị marker (cơ sở, điểm bán) và polygon (vùng nguyên liệu, diện tích) theo lớp
 
 ## Cấu trúc file
 
@@ -27,7 +27,7 @@ Trong file Google Sheet (đã import từ `BanDo_CPART_DuLieu_Mau.xlsx`):
 # Tạo repo mới (hoặc dùng repo có sẵn như hungps2.github.io)
 git init
 git add index.html app.js config.js
-git commit -m "Bản đồ vùng nguyên liệu CPART"
+git commit -m "Bản đồ vùng nguyên liệu BND"
 git branch -M main
 git remote add origin https://github.com/<tai-khoan>/<ten-repo>.git
 git push -u origin main
