@@ -154,17 +154,19 @@
     return (MAP_CONFIG.LAYER_COLORS && MAP_CONFIG.LAYER_COLORS[layerName]) || fallback;
   }
 
-  // Đổi link Google Drive dạng share (.../file/d/ID/view) sang dạng hiển thị ảnh trực tiếp
+  // Đổi link Google Drive dạng share (.../file/d/ID/view) sang dạng hiển thị ảnh trực tiếp.
+  // Lưu ý: định dạng cũ "uc?export=view&id=" đã bị Google Drive hạn chế hotlink (hay trả lỗi/icon hỏng
+  // dù file đã public). Dùng "thumbnail?id=...&sz=w1000" ổn định hơn nhiều cho việc nhúng trực tiếp.
   function toDirectImageURL(url) {
     if (!url) return url;
     const trimmed = url.trim();
     const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/]+)/);
     if (driveMatch) {
-      return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+      return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w1000`;
     }
     const openMatch = trimmed.match(/drive\.google\.com\/open\?id=([^&]+)/);
     if (openMatch) {
-      return `https://drive.google.com/uc?export=view&id=${openMatch[1]}`;
+      return `https://drive.google.com/thumbnail?id=${openMatch[1]}&sz=w1000`;
     }
     return trimmed;
   }
@@ -186,13 +188,23 @@
     const encoded = encodeURIComponent(JSON.stringify(images));
 
     const tiles = shown
-      .map(
-        (url, idx) =>
-          `<img src="${escapeHTML(url)}" data-gallery="${encoded}" data-index="${idx}" loading="lazy" alt="">`
-      )
+      .map((url, idx) => {
+        const fallback = toFallbackImageURL(url);
+        const onerror = fallback
+          ? `this.onerror=null;this.src='${fallback.replace(/'/g, "\\'")}';`
+          : `this.onerror=null;this.classList.add('img-broken');`;
+        return `<img src="${escapeHTML(url)}" onerror="${onerror}" data-gallery="${encoded}" data-index="${idx}" loading="lazy" alt="">`;
+      })
       .join("");
 
     return `<div class="popup-gallery" data-group="${groupId}">${tiles}</div>`;
+  }
+
+  // Link dự phòng nếu thumbnail?id=... lỗi: thử kiểu uc?export=view (đôi khi 1 trong 2 hoạt động tuỳ file)
+  function toFallbackImageURL(thumbnailUrl) {
+    const m = thumbnailUrl.match(/thumbnail\?id=([^&]+)/);
+    if (!m) return null;
+    return `https://drive.google.com/uc?export=view&id=${m[1]}`;
   }
 
   function getOrCreateLayerEntry(layerName, kind, defaultColor) {
@@ -448,7 +460,15 @@
   }
 
   function updateLightboxImage() {
-    lbImg.src = currentGallery[currentIndex];
+    const url = currentGallery[currentIndex];
+    lbImg.onerror = function () {
+      const fallback = toFallbackImageURL(url);
+      if (fallback && lbImg.src !== fallback) {
+        lbImg.onerror = null;
+        lbImg.src = fallback;
+      }
+    };
+    lbImg.src = url;
     lbCount.textContent = `${currentIndex + 1} / ${currentGallery.length}`;
     const multi = currentGallery.length > 1;
     lbPrev.style.visibility = multi ? "visible" : "hidden";
