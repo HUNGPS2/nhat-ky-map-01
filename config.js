@@ -25,7 +25,7 @@ const MAP_CONFIG = {
   GOOD_ACCURACY_METERS: 8,
   
    // Link CSV public của sheet Orthomosaic (ảnh chụp drone độ phân giải cao theo từng vùng)
-  ORTHOMOSAIC_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSIaaN5wcn5nbOeo6X1PImI4d9_wOBtvzk4nV9XWMmOvO-d3PeRO6GIaKbBMqzLplHnA8VNfHQMO9DM/pubhtml?gid=1036646683&single=true",
+  ORTHOMOSAIC_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSIaaN5wcn5nbOeo6X1PImI4d9_wOBtvzk4nV9XWMmOvO-d3PeRO6GIaKbBMqzLplHnA8VNfHQMO9DM/pub?gid=1036646683&single=true&output=csv",
 
   
   // Tâm bản đồ mặc định và mức zoom ban đầu (giống bản mẫu: Ba Bể, Bắc Kạn)
