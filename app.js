@@ -600,6 +600,37 @@
   // Tự động ẩn/hiện lớp Cây trồng khi người dùng zoom vào/ra
   map.on("zoomend", applyCayTrongZoomVisibility);
 
+  // ---------------------------------------------------------------
+  // Chỉ số mức zoom hiện tại — đặt ngay dưới control +/- của Leaflet
+  // ---------------------------------------------------------------
+  const zoomIndicator = document.getElementById("zoom-indicator");
+
+  function positionZoomIndicator() {
+    const zoomControlEl = document.querySelector(".leaflet-control-zoom");
+    if (!zoomControlEl) return;
+    const rect = zoomControlEl.getBoundingClientRect();
+    const mapRect = document.getElementById("map").getBoundingClientRect();
+    zoomIndicator.style.top = (rect.bottom - mapRect.top + 8) + "px";
+  }
+
+  function updateZoomIndicator() {
+    const z = map.getZoom();
+    const minZoom = MAP_CONFIG.CAYTRONG_MIN_ZOOM || 17;
+    zoomIndicator.textContent = "Z" + z;
+    zoomIndicator.title = z >= minZoom
+      ? "Đủ zoom để xem lớp Cây trồng"
+      : `Zoom thêm ${minZoom - z} mức nữa để thấy lớp Cây trồng`;
+    zoomIndicator.style.color = z >= minZoom ? "var(--moss-dark)" : "#8b9186";
+  }
+
+  map.on("zoomend", updateZoomIndicator);
+  map.on("zoomend", positionZoomIndicator);
+  map.whenReady(() => {
+    positionZoomIndicator();
+    updateZoomIndicator();
+  });
+  window.addEventListener("resize", positionZoomIndicator);
+
   // Initial load
   loadAll(true);
 
