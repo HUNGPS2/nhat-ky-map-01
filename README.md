@@ -1,4 +1,4 @@
-# Bản đồ vùng nguyên liệu & cơ sở BND
+# Bản đồ vùng nguyên liệu & cơ sở Trung tâm sản xuất sạch hơn CPART
 
 Trang bản đồ tương tác đọc dữ liệu trực tiếp từ Google Sheets, hiển thị marker (cơ sở, điểm bán) và polygon (vùng nguyên liệu, diện tích) theo lớp
 
