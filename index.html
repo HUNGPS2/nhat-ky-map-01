@@ -2,153 +2,259 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Định vị cây trồng — CPART</title>
+<meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+<title>Bản đồ vùng nguyên liệu &amp; cơ sở CPART</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <style>
   :root{
-    --ink:#1c2b1f; --paper:#f6f4ee; --moss:#3d5c3a; --moss-dark:#2a4027;
-    --clay:#b5651d; --line:#d8d2c2; --panel:#ffffff; --err:#b5462e; --ok:#3d5c3a;
+    --ink:#1c2b1f;
+    --paper:#f6f4ee;
+    --moss:#3d5c3a;
+    --moss-dark:#2a4027;
+    --clay:#b5651d;
+    --clay-soft:#e7c9a8;
+    --line:#d8d2c2;
+    --panel:#ffffff;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);
-    font-family:'Inter','Segoe UI',Arial,sans-serif;}
-  body{min-height:100vh;display:flex;flex-direction:column;}
-
-  header{
-    padding:18px 20px 14px;
-    background:var(--moss);color:#fff;
-  }
-  header h1{margin:0;font-size:17px;font-weight:700;}
-  header p{margin:4px 0 0;font-size:12.5px;opacity:0.85;}
-
-  main{flex:1;padding:18px;max-width:480px;width:100%;margin:0 auto;}
-
-  .card{
-    background:var(--panel);border-radius:14px;padding:18px;
-    box-shadow:0 2px 10px rgba(0,0,0,0.06);margin-bottom:16px;
+  html,body{height:100%;margin:0;padding:0;}
+  body{
+    font-family:'Inter','Segoe UI',Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    overflow:hidden;
   }
 
-  .gps-box{
-    text-align:center;padding:22px 16px;
-  }
-  .gps-status{
-    font-size:13px;color:#6b7268;margin-bottom:14px;min-height:18px;
-  }
-  .gps-coords{
-    font-size:22px;font-weight:700;color:var(--moss-dark);
-    font-variant-numeric:tabular-nums;
-    margin-bottom:4px;
-  }
-  .gps-accuracy{
-    font-size:12px;color:#8b9186;margin-bottom:16px;
-  }
-  .gps-accuracy.warn{color:#c79b3d;font-weight:600;}
-  .gps-accuracy.good{color:var(--ok);font-weight:600;}
+  #app{position:relative;height:100vh;width:100vw;}
+  #map{position:absolute;inset:0;z-index:1;}
 
-  button{
-    border:none;border-radius:12px;font-weight:700;font-size:15px;
-    cursor:pointer;width:100%;padding:15px;
-    transition:transform .1s, opacity .15s;
+  /* ---------- Header ---------- */
+  #topbar{
+    position:absolute;top:0;left:0;right:0;z-index:1000;
+    display:flex;align-items:center;gap:12px;
+    padding:14px 18px;
+    background:linear-gradient(180deg, rgba(28,43,31,0.92), rgba(28,43,31,0.0));
+    pointer-events:none;
   }
-  button:active{transform:scale(0.98);}
-  button:disabled{opacity:0.5;cursor:not-allowed;}
+  #topbar .brand{
+    pointer-events:auto;
+    display:flex;align-items:center;gap:10px;
+    background:var(--panel);
+    border-radius:999px;
+    padding:8px 16px 8px 10px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.18);
+  }
+  #topbar .brand .mark{
+    width:30px;height:30px;border-radius:50%;
+    background:var(--moss);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:700;font-size:13px;
+    font-family:Georgia,serif;
+  }
+  #topbar .brand .title{
+    font-weight:600;font-size:14.5px;letter-spacing:0.2px;color:var(--ink);
+    line-height:1.15;
+  }
+  #topbar .brand .sub{
+    font-size:11px;color:#6b7268;font-weight:400;
+  }
 
-  .btn-gps{
-    background:var(--moss);color:#fff;
+  #status-pill{
+    pointer-events:auto;
+    margin-left:auto;
+    font-size:11.5px;
+    background:var(--panel);
+    border-radius:999px;
+    padding:7px 14px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.18);
+    color:#5d655a;
+    display:flex;align-items:center;gap:6px;
   }
-  .btn-gps.locating{background:#8b9186;}
+  #status-pill .dot{
+    width:7px;height:7px;border-radius:50%;background:#9aa39a;
+    transition:background .3s;
+  }
+  #status-pill .dot.ok{background:#4d8b4f;}
+  #status-pill .dot.err{background:#b5462e;}
+  #status-pill .dot.loading{background:#c79b3d;animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  #status-pill button{
+    border:none;background:transparent;color:var(--moss-dark);
+    font-weight:600;font-size:11.5px;cursor:pointer;padding:0;margin-left:4px;
+  }
 
-  label{
-    display:block;font-size:12.5px;font-weight:600;color:#4b5247;
-    margin:14px 0 6px;
+  /* ---------- Layer panel ---------- */
+  #layer-panel{
+    position:absolute;left:14px;bottom:14px;z-index:1000;
+    background:var(--panel);
+    border-radius:14px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.18);
+    width:268px;
+    max-height:58vh;
+    display:flex;flex-direction:column;
+    overflow-y:auto;
   }
-  label:first-child{margin-top:0;}
-  input[type=text], select, textarea{
-    width:100%;padding:11px 12px;border:1.5px solid var(--line);
-    border-radius:9px;font-size:14.5px;font-family:inherit;
-    background:#fcfbf8;color:var(--ink);
+  #layer-panel .lp-head{
+    padding:12px 14px 8px;
+    font-size:12px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;
+    color:var(--moss-dark);
   }
-  input:focus, select:focus, textarea:focus{
-    outline:none;border-color:var(--moss);
+  #basemap-list{padding:0 6px 6px;}
+  #layer-list{
+    padding:0 6px 8px;
   }
-  textarea{resize:vertical;min-height:60px;}
+  .layer-group{margin-bottom:2px;}
+  .layer-row{
+    display:flex;align-items:center;gap:9px;
+    padding:7px 8px;border-radius:9px;
+    cursor:pointer;font-size:13px;
+    user-select:none;
+  }
+  .layer-row:hover{background:#f1efe7;}
+  .layer-row input{accent-color:var(--moss);width:15px;height:15px;cursor:pointer;}
+  .layer-row .swatch{
+    width:11px;height:11px;border-radius:3px;flex:0 0 auto;
+  }
+  .layer-row .swatch.dot{border-radius:50%;}
+  .layer-row .lbl{flex:1;line-height:1.25;}
+  .layer-row .count{
+    font-size:11px;color:#8b9186;background:#eee9dd;
+    padding:1px 7px;border-radius:999px;
+  }
 
-  .btn-submit{
-    background:var(--clay);color:#fff;margin-top:18px;
+  /* ---------- Popup ---------- */
+  .leaflet-popup-content-wrapper{
+    border-radius:12px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.22);
   }
-  .btn-submit:disabled{background:#cbb89e;}
-
-  .toast{
-    position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
-    background:var(--ink);color:#fff;padding:13px 20px;border-radius:10px;
-    font-size:13.5px;opacity:0;pointer-events:none;
-    transition:opacity .25s, transform .25s;
-    max-width:90vw;text-align:center;z-index:999;
+  .leaflet-popup-content{margin:14px 16px;min-width:200px;}
+  .popup-eyebrow{
+    font-size:10.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;
+    color:var(--moss);margin-bottom:3px;
   }
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-  .toast.err{background:var(--err);}
-  .toast.ok{background:var(--ok);}
+  .popup-title{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px;line-height:1.3;}
+  .popup-row{font-size:12.5px;color:#4b5247;margin-bottom:3px;line-height:1.45;}
+  .popup-row b{color:#2c332a;font-weight:600;}
+  .popup-img{width:100%;border-radius:8px;margin-top:8px;display:block;}
+  .popup-desc{margin-top:6px;font-size:12.5px;color:#555c50;line-height:1.5;}
 
-  .recent-list{font-size:12.5px;color:#6b7268;}
-  .recent-item{
-    display:flex;justify-content:space-between;
-    padding:7px 0;border-bottom:1px solid var(--line);
+  /* ---------- Photo gallery in popup ---------- */
+  .popup-gallery{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:5px;
+    margin-top:8px;
   }
-  .recent-item:last-child{border-bottom:none;}
-  .recent-item b{color:var(--ink);font-weight:600;}
+  .popup-gallery img{
+    width:100%;height:62px;object-fit:cover;border-radius:7px;
+    cursor:pointer;
+    transition:opacity .15s;
+    background:#eee9dd;
+  }
+  .popup-gallery img:hover{opacity:0.82;}
+  .popup-gallery img.img-broken{
+    object-fit:none;background:#f1efe7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='22' height='22' fill='none' stroke='%23a8ad9f' stroke-width='1.6'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 16l5-5 4 4 5-6 4 5'/%3E%3Ccircle cx='8' cy='8' r='1.4'/%3E%3C/svg%3E") center/28px no-repeat;
+    cursor:default;
+  }
+  .popup-gallery .more-tile{
+    width:100%;height:62px;border-radius:7px;
+    background:#eee9dd;color:#6b7268;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;cursor:pointer;
+  }
 
-  .hint{font-size:11.5px;color:#8b9186;margin-top:8px;line-height:1.5;}
+  /* ---------- Lightbox ---------- */
+  #lightbox{
+    position:fixed;inset:0;z-index:3000;
+    background:rgba(15,20,15,0.92);
+    display:none;align-items:center;justify-content:center;
+    flex-direction:column;
+  }
+  #lightbox.open{display:flex;}
+  #lightbox img{
+    max-width:88vw;max-height:74vh;border-radius:10px;
+    box-shadow:0 10px 40px rgba(0,0,0,0.5);
+  }
+  #lightbox .lb-nav{
+    display:flex;align-items:center;gap:22px;margin-top:16px;
+  }
+  #lightbox .lb-btn{
+    background:rgba(255,255,255,0.12);color:#fff;border:none;
+    width:38px;height:38px;border-radius:50%;
+    font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  #lightbox .lb-btn:hover{background:rgba(255,255,255,0.22);}
+  #lightbox .lb-count{color:#cfd4c9;font-size:12.5px;min-width:48px;text-align:center;}
+  #lightbox .lb-close{
+    position:absolute;top:18px;right:22px;
+    background:transparent;border:none;color:#fff;font-size:26px;cursor:pointer;
+    line-height:1;
+  }
+
+  /* ---------- Empty / error state ---------- */
+  #empty-state{
+    position:absolute;z-index:1000;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:var(--panel);padding:22px 26px;border-radius:14px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.2);
+    max-width:320px;text-align:center;display:none;
+  }
+  #empty-state h3{margin:0 0 6px;font-size:15px;color:var(--ink);}
+  #empty-state p{margin:0;font-size:12.5px;color:#6b7268;line-height:1.5;}
+
+  /* ---------- Mobile ---------- */
+  @media (max-width:640px){
+    #layer-panel{width:calc(100vw - 28px);max-height:38vh;}
+    #topbar .brand .sub{display:none;}
+    #status-pill{font-size:10.5px;padding:6px 10px;}
+  }
+
+  .leaflet-control-zoom{margin-top:64px !important;}
 </style>
 </head>
 <body>
+<div id="app">
+  <div id="map"></div>
 
-<header>
-  <h1>🌳 Định vị cây trồng</h1>
-  <p>CPART — đứng cạnh cây, bấm lấy vị trí, điền thông tin</p>
-</header>
-
-<main>
-  <div class="card gps-box">
-    <div class="gps-status" id="gps-status">Chưa lấy vị trí</div>
-    <div class="gps-coords" id="gps-coords">—</div>
-    <div class="gps-accuracy" id="gps-accuracy"></div>
-    <button class="btn-gps" id="btn-gps">📍 Lấy vị trí hiện tại</button>
-    <div class="hint">Đứng sát gốc cây, đợi vài giây để GPS ổn định trước khi bấm. Độ chính xác dưới 8m là tốt.</div>
-  </div>
-
-  <div class="card">
-    <label for="loai-cay">Loại cây *</label>
-    <select id="loai-cay">
-      <option value="">— Chọn loại cây —</option>
-      <option value="Cam">Cam</option>
-      <option value="Ổi">Ổi</option>
-      <option value="Bưởi">Bưởi</option>
-      <option value="Xoài">Xoài</option>
-      <option value="Nhãn">Nhãn</option>
-      <option value="Khác">Khác (ghi rõ ở ghi chú)</option>
-    </select>
-
-    <label for="vung-id">Mã vùng nguyên liệu (VungID)</label>
-    <input type="text" id="vung-id" placeholder="Vd: VT001">
-
-    <label for="ghi-chu">Ghi chú</label>
-    <textarea id="ghi-chu" placeholder="Năm tuổi, tình trạng, sản lượng dự kiến..."></textarea>
-
-    <button class="btn-submit" id="btn-submit" disabled>Lưu cây này</button>
-  </div>
-
-  <div class="card">
-    <div style="font-size:12.5px;font-weight:700;color:var(--moss-dark);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">
-      Đã ghi trong phiên này
+  <div id="topbar">
+    <div class="brand">
+      <div class="mark">C</div>
+      <div>
+        <div class="title">Bản đồ vùng nguyên liệu &amp; cơ sở</div>
+        <div class="sub">CPART — Trung tâm sản xuất sạch hơn</div>
+      </div>
     </div>
-    <div class="recent-list" id="recent-list">
-      <div style="color:#a8ad9f;">Chưa có cây nào</div>
+    <div id="status-pill">
+      <span class="dot loading" id="status-dot"></span>
+      <span id="status-text">Đang tải dữ liệu…</span>
+      <button id="refresh-btn" title="Tải lại dữ liệu">↻</button>
     </div>
   </div>
-</main>
 
-<div class="toast" id="toast"></div>
+  <div id="layer-panel">
+    <div class="lp-head">Nền bản đồ</div>
+    <div id="basemap-list"></div>
+    <div class="lp-head" style="border-top:1px solid var(--line);margin-top:4px;">Lớp dữ liệu</div>
+    <div id="layer-list"></div>
+  </div>
 
+  <div id="empty-state">
+    <h3>Chưa có dữ liệu hiển thị</h3>
+    <p>Không tải được dữ liệu từ Google Sheets, hoặc chưa có dòng nào ở trạng thái "Active". Kiểm tra lại cấu hình SHEET_CSV_URL trong config.js.</p>
+  </div>
+
+  <div id="lightbox">
+    <button class="lb-close" id="lb-close" aria-label="Đóng">&times;</button>
+    <img id="lb-img" src="" alt="">
+    <div class="lb-nav">
+      <button class="lb-btn" id="lb-prev" aria-label="Ảnh trước">&#8249;</button>
+      <span class="lb-count" id="lb-count"></span>
+      <button class="lb-btn" id="lb-next" aria-label="Ảnh sau">&#8250;</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>
