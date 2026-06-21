@@ -40,6 +40,9 @@
   // layerName -> { group: L.LayerGroup, color: string, kind: 'marker'|'polygon', count: number }
   const layerRegistry = new Map();
 
+  // VungID -> { id, tenLop, imageUrl, thumbUrl, bounds: {north,south,east,west}, doPhanGiai }
+  const orthoRegistry = new Map();
+
   // ---------------------------------------------------------------
   // Basemap switcher (Bản đồ thường / Địa hình)
   // ---------------------------------------------------------------
@@ -284,6 +287,45 @@
       .filter(([lat, lng]) => !isNaN(lat) && !isNaN(lng));
   }
 
+  // ---------------------------------------------------------------
+  // Orthomosaic registry — nạp từ sheet Orthomosaic, tra cứu theo VungID
+  // ---------------------------------------------------------------
+  function loadOrthomosaicRegistry(rows) {
+    orthoRegistry.clear();
+    rows
+      .filter((r) => (r.TrangThai || "").toLowerCase() !== "ẩn" && (r.TrangThai || "").toLowerCase() !== "an")
+      .forEach((r) => {
+        const north = parseFloat(r.BoundsNorth);
+        const south = parseFloat(r.BoundsSouth);
+        const east = parseFloat(r.BoundsEast);
+        const west = parseFloat(r.BoundsWest);
+        if ([north, south, east, west].some((v) => isNaN(v))) return;
+        if (!r.ImageURL) return;
+
+        orthoRegistry.set(r.VungID, {
+          id: r.ID,
+          vungId: r.VungID,
+          tenLop: r.TenLop || "Orthomosaic",
+          imageUrl: toDirectImageURL(r.ImageURL),
+          thumbUrl: r.ThumbURL ? toDirectImageURL(r.ThumbURL) : toDirectImageURL(r.ImageURL),
+          bounds: { north, south, east, west },
+          doPhanGiai: r.DoPhanGiai_cm || "",
+        });
+      });
+  }
+
+  function buildOrthoButtonHTML(vungId) {
+    const ortho = orthoRegistry.get(vungId);
+    if (!ortho) return "";
+    return `
+      <img class="ortho-thumb-preview" src="${escapeHTML(ortho.thumbUrl)}" loading="lazy" alt=""
+           onclick="window.__openOrthoViewer('${escapeHTML(vungId)}')">
+      <button class="ortho-btn" onclick="window.__openOrthoViewer('${escapeHTML(vungId)}')">
+        <span class="ortho-ico">🛰️</span> Xem ảnh chi tiết (Orthomosaic)
+      </button>
+    `;
+  }
+
   function renderVungDienTich(rows) {
     rows
       .filter((r) => (r.TrangThai || "").toLowerCase() !== "ẩn" && (r.TrangThai || "").toLowerCase() !== "an")
@@ -314,6 +356,7 @@
         const descHtml = r.MoTa ? `<div class="popup-desc">${escapeHTML(r.MoTa)}</div>` : "";
         const images = parseImageList(r.AnhURLs);
         const galleryHtml = buildGalleryHTML(images, "VT-" + (r.ID || layerName));
+        const orthoHtml = buildOrthoButtonHTML(r.ID);
 
         polygon.bindPopup(`
           <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
@@ -322,6 +365,7 @@
           ${cropHtml}
           ${descHtml}
           ${galleryHtml}
+          ${orthoHtml}
         `);
 
         entry.group.addLayer(polygon);
@@ -366,6 +410,7 @@
           ? `<div class="popup-row"><b>Nguồn dữ liệu:</b> ${escapeHTML(r.NguonDuLieu)}</div>`
           : "";
         const descHtml = r.GhiChu ? `<div class="popup-desc">${escapeHTML(r.GhiChu)}</div>` : "";
+        const orthoHtmlTree = buildOrthoButtonHTML(r.VungID);
 
         marker.bindPopup(`
           <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
@@ -375,6 +420,7 @@
           ${accHtml}
           ${nguonHtml}
           ${descHtml}
+          ${orthoHtmlTree}
         `);
 
         entry.group.addLayer(marker);
@@ -488,11 +534,15 @@
   async function loadAll(isFirstLoad) {
     setStatus("loading", "Đang tải dữ liệu…");
     try {
-      const [diaDiemRows, vungRows, cayRows] = await Promise.all([
+      const [diaDiemRows, vungRows, cayRows, orthoRows] = await Promise.all([
         fetchCSV(MAP_CONFIG.DIADIEM_CSV_URL).catch(() => []),
         fetchCSV(MAP_CONFIG.VUNGDIENTICH_CSV_URL).catch(() => []),
         fetchCSV(MAP_CONFIG.CAYTRONG_CSV_URL).catch(() => []),
+        fetchCSV(MAP_CONFIG.ORTHOMOSAIC_CSV_URL).catch(() => []),
       ]);
+
+      // Nạp registry orthomosaic TRƯỚC khi vẽ popup, vì popup tra cứu registry này
+      loadOrthomosaicRegistry(orthoRows);
 
       // Reset toàn bộ layer cũ trước khi vẽ lại
       layerRegistry.forEach((entry) => map.removeLayer(entry.group));
@@ -630,6 +680,97 @@
     updateZoomIndicator();
   });
   window.addEventListener("resize", positionZoomIndicator);
+
+  // ---------------------------------------------------------------
+  // Orthomosaic full-screen viewer — Leaflet riêng, dùng imageOverlay
+  // để pan/zoom mượt trên ảnh độ phân giải cao, định vị đúng theo bounds thật
+  // ---------------------------------------------------------------
+  const orthoViewerEl = document.getElementById("ortho-viewer");
+  const orthoViewerClose = document.getElementById("ortho-viewer-close");
+  const orthoViewerTitle = document.getElementById("ortho-viewer-title");
+  const orthoViewerSub = document.getElementById("ortho-viewer-sub");
+
+  let orthoMap = null;
+  let orthoImageLayer = null;
+
+  function openOrthoViewer(vungId) {
+    const ortho = orthoRegistry.get(vungId);
+    if (!ortho) {
+      showEmptyOrthoNotice();
+      return;
+    }
+
+    orthoViewerTitle.textContent = ortho.tenLop + (vungId ? ` — ${vungId}` : "");
+    orthoViewerSub.textContent = ortho.doPhanGiai
+      ? `Độ phân giải ~${ortho.doPhanGiai}cm/pixel`
+      : "Ảnh chụp độ phân giải cao";
+
+    orthoViewerEl.classList.add("open");
+    document.body.style.overflow = "hidden";
+
+    const b = ortho.bounds;
+    const leafletBounds = [
+      [b.south, b.west],
+      [b.north, b.east],
+    ];
+
+    // Khởi tạo map riêng cho viewer chỉ 1 lần, các lần sau tái sử dụng
+    if (!orthoMap) {
+      orthoMap = L.map("ortho-map", {
+        crs: L.CRS.EPSG3857,
+        minZoom: 10,
+        maxZoom: 24,
+        zoomControl: true,
+        attributionControl: false,
+      });
+    }
+
+    if (orthoImageLayer) {
+      orthoMap.removeLayer(orthoImageLayer);
+    }
+
+    orthoImageLayer = L.imageOverlay(ortho.imageUrl, leafletBounds, {
+      interactive: false,
+    }).addTo(orthoMap);
+
+    // Cho phép kéo/zoom tự do nhưng giới hạn không trôi quá xa khỏi ảnh
+    const padded = L.latLngBounds(leafletBounds).pad(0.6);
+    orthoMap.setMaxBounds(padded);
+
+    // Đợi viewer hiện ra (display:flex áp dụng) rồi mới invalidateSize + fitBounds,
+    // vì Leaflet cần kích thước container đã render xong để tính đúng
+    requestAnimationFrame(() => {
+      orthoMap.invalidateSize();
+      orthoMap.fitBounds(leafletBounds, { padding: [20, 20] });
+    });
+  }
+
+  function showEmptyOrthoNotice() {
+    showToastIfAvailable("Vùng này chưa có dữ liệu orthomosaic");
+  }
+
+  function showToastIfAvailable(msg) {
+    // Dùng lại style toast nếu trang có sẵn, fallback alert nhẹ nhàng nếu không
+    console.warn(msg);
+  }
+
+  function closeOrthoViewer() {
+    orthoViewerEl.classList.remove("open");
+    document.body.style.overflow = "";
+  }
+
+  orthoViewerClose.addEventListener("click", closeOrthoViewer);
+  orthoViewerEl.addEventListener("click", (e) => {
+    if (e.target === orthoViewerEl) closeOrthoViewer();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && orthoViewerEl.classList.contains("open")) {
+      closeOrthoViewer();
+    }
+  });
+
+  // Expose ra global để onclick inline trong popup HTML gọi được
+  window.__openOrthoViewer = openOrthoViewer;
 
   // Initial load
   loadAll(true);

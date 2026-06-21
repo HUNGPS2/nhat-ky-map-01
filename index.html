@@ -192,6 +192,55 @@
     line-height:1;
   }
 
+  /* ---------- Nút mở Orthomosaic trong popup ---------- */
+  .ortho-btn{
+    display:flex;align-items:center;gap:7px;
+    margin-top:10px;padding:9px 12px;
+    background:#eef1e6;border:1.5px solid var(--moss);
+    border-radius:9px;cursor:pointer;
+    font-size:12.5px;font-weight:700;color:var(--moss-dark);
+    width:100%;
+    transition:background .15s;
+  }
+  .ortho-btn:hover{background:#e2e8d6;}
+  .ortho-btn .ortho-ico{font-size:15px;}
+  .ortho-thumb-preview{
+    width:100%;border-radius:8px;margin-top:8px;display:block;
+    cursor:pointer;
+  }
+
+  /* ---------- Orthomosaic full-screen viewer ---------- */
+  #ortho-viewer{
+    position:fixed;inset:0;z-index:2500;
+    background:#11140f;
+    display:none;flex-direction:column;
+  }
+  #ortho-viewer.open{display:flex;}
+  #ortho-viewer-header{
+    padding:14px 18px;background:#1c2418;color:#fff;
+    display:flex;align-items:center;gap:12px;
+    flex-shrink:0;
+  }
+  #ortho-viewer-header .ov-title{
+    font-size:14.5px;font-weight:700;flex:1;
+  }
+  #ortho-viewer-header .ov-sub{
+    font-size:11.5px;color:#a8b39c;font-weight:400;margin-top:2px;
+  }
+  #ortho-viewer-close{
+    background:rgba(255,255,255,0.1);border:none;color:#fff;
+    width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  #ortho-viewer-close:hover{background:rgba(255,255,255,0.2);}
+  #ortho-map{flex:1;background:#11140f;}
+  #ortho-viewer-hint{
+    position:absolute;bottom:18px;left:50%;transform:translateX(-50%);
+    background:rgba(0,0,0,0.55);color:#dfe3d6;
+    padding:7px 16px;border-radius:999px;font-size:11.5px;
+    pointer-events:none;
+  }
+
   /* ---------- Empty / error state ---------- */
   #empty-state{
     position:absolute;z-index:1000;left:50%;top:50%;transform:translate(-50%,-50%);
@@ -266,6 +315,18 @@
       <span class="lb-count" id="lb-count"></span>
       <button class="lb-btn" id="lb-next" aria-label="Ảnh sau">&#8250;</button>
     </div>
+  </div>
+
+  <div id="ortho-viewer">
+    <div id="ortho-viewer-header">
+      <div>
+        <div class="ov-title" id="ortho-viewer-title">Orthomosaic</div>
+        <div class="ov-sub" id="ortho-viewer-sub"></div>
+      </div>
+      <button id="ortho-viewer-close" aria-label="Đóng">&times;</button>
+    </div>
+    <div id="ortho-map"></div>
+    <div id="ortho-viewer-hint">Kéo để di chuyển · Cuộn/chụm để zoom</div>
   </div>
 </div>
 
