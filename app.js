@@ -210,66 +210,6 @@
     return `https://drive.google.com/uc?export=view&id=${m[1]}`;
   }
 
-  // ---------------------------------------------------------------
-  // Video helpers — hỗ trợ YouTube và Google Drive
-  // ---------------------------------------------------------------
-  function detectVideoType(url) {
-    if (!url) return null;
-    const t = url.trim();
-    if (t.match(/youtube\.com\/watch|youtu\.be\//)) return "youtube";
-    if (t.match(/drive\.google\.com\/file\/d\//)) return "drive";
-    return null;
-  }
-
-  function getYouTubeId(url) {
-    const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-    return m ? m[1] : null;
-  }
-
-  function parseVideoList(str) {
-    if (!str) return [];
-    return str
-      .split(";")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .filter((u) => detectVideoType(u) !== null); // bỏ link không nhận dạng được
-  }
-
-  function buildVideoGalleryHTML(videos, groupId) {
-    if (!videos || videos.length === 0) return "";
-
-    const tiles = videos
-      .slice(0, 6) // tối đa 6 video giống ảnh
-      .map((url, idx) => {
-        const type = detectVideoType(url);
-        if (type === "youtube") {
-          const vid = getYouTubeId(url);
-          if (!vid) return "";
-          const thumb = `https://img.youtube.com/vi/${vid}/mqdefault.jpg`;
-          return `<div class="video-tile" data-video-url="${escapeHTML(url)}" data-video-type="youtube" data-video-id="${vid}" data-group="${escapeHTML(groupId)}" data-index="${idx}">
-            <img src="${thumb}" alt="" loading="lazy">
-            <div class="video-play-btn">▶</div>
-          </div>`;
-        }
-        if (type === "drive") {
-          const driveM = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
-          const fileId = driveM ? driveM[1] : null;
-          if (!fileId) return "";
-          // Drive không có thumbnail tự động như YouTube — dùng icon placeholder
-          return `<div class="video-tile video-tile--drive" data-video-url="${escapeHTML(url)}" data-video-type="drive" data-video-id="${fileId}" data-group="${escapeHTML(groupId)}" data-index="${idx}">
-            <div class="video-drive-icon">📹</div>
-            <div class="video-play-btn">▶</div>
-          </div>`;
-        }
-        return "";
-      })
-      .join("");
-
-    if (!tiles.trim()) return "";
-
-    return `<div class="video-gallery" data-group="${escapeHTML(groupId)}">${tiles}</div>`;
-  }
-
   function getOrCreateLayerEntry(layerName, kind, defaultColor) {
     if (!layerRegistry.has(layerName)) {
       layerRegistry.set(layerName, {
@@ -308,8 +248,6 @@
 
         const images = parseImageList(r.AnhURLs || r.AnhURL);
         const galleryHtml = buildGalleryHTML(images, "DD-" + (r.ID || layerName));
-        const videos = parseVideoList(r.VideoURLs || "");
-        const videoGalleryHtml = buildVideoGalleryHTML(videos, "DD-" + (r.ID || layerName));
         const phoneHtml = r.SDT
           ? `<div class="popup-row"><b>Điện thoại:</b> ${escapeHTML(r.SDT)}</div>`
           : "";
@@ -325,7 +263,6 @@
           ${phoneHtml}
           ${descHtml}
           ${galleryHtml}
-          ${videoGalleryHtml}
         `);
 
         entry.group.addLayer(marker);
@@ -419,8 +356,6 @@
         const descHtml = r.MoTa ? `<div class="popup-desc">${escapeHTML(r.MoTa)}</div>` : "";
         const images = parseImageList(r.AnhURLs);
         const galleryHtml = buildGalleryHTML(images, "VT-" + (r.ID || layerName));
-        const videos = parseVideoList(r.VideoURLs || "");
-        const videoGalleryHtml = buildVideoGalleryHTML(videos, "VT-" + (r.ID || layerName));
         const orthoHtml = buildOrthoButtonHTML(r.ID);
 
         polygon.bindPopup(`
@@ -430,7 +365,6 @@
           ${cropHtml}
           ${descHtml}
           ${galleryHtml}
-          ${videoGalleryHtml}
           ${orthoHtml}
         `);
 
@@ -597,31 +531,15 @@
   // ---------------------------------------------------------------
   // Main load cycle
   // ---------------------------------------------------------------
-  // Email người dùng đã nhập để xác thực, lưu trong session (không persist qua localStorage
-  // theo mặc định để tránh để lộ trên thiết bị dùng chung — có thể bật lại nếu cần)
-  let currentUserEmail = "";
-
-  async function fetchGatekeeperData(email) {
-    const url = new URL(MAP_CONFIG.GATEKEEPER_API_URL);
-    if (email) url.searchParams.set("email", email);
-    url.searchParams.set("_", Date.now()); // chống cache
-
-    const res = await fetch(url.toString(), { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return res.json();
-  }
-
   async function loadAll(isFirstLoad) {
     setStatus("loading", "Đang tải dữ liệu…");
     try {
-      const data = await fetchGatekeeperData(currentUserEmail);
-
-      const diaDiemRows = data.diaDiem || [];
-      const vungRows = data.vungDienTich || [];
-      const cayRows = data.cayTrong || [];
-      const orthoRows = data.orthomosaic || [];
-
-      updateAuthStatusUI(data.isAuthorized);
+      const [diaDiemRows, vungRows, cayRows, orthoRows] = await Promise.all([
+        fetchCSV(MAP_CONFIG.DIADIEM_CSV_URL).catch(() => []),
+        fetchCSV(MAP_CONFIG.VUNGDIENTICH_CSV_URL).catch(() => []),
+        fetchCSV(MAP_CONFIG.CAYTRONG_CSV_URL).catch(() => []),
+        fetchCSV(MAP_CONFIG.ORTHOMOSAIC_CSV_URL).catch(() => []),
+      ]);
 
       // Nạp registry orthomosaic TRƯỚC khi vẽ popup, vì popup tra cứu registry này
       loadOrthomosaicRegistry(orthoRows);
@@ -693,18 +611,8 @@
   }
 
   function closeLightbox() {
-    // Dọn dẹp video player nếu đang xem video
-    const lb = lightbox;
-    if (lb.dataset.mode === "video") {
-      const player = lb.querySelector(".video-player-container");
-      if (player) player.remove();
-      lbImg.style.display = "";
-      lb.querySelector(".lb-nav").style.display = "";
-      delete lb.dataset.mode;
-    }
     lightbox.classList.remove("open");
     lbImg.src = "";
-    document.body.style.overflow = "";
   }
 
   lbPrev.addEventListener("click", () => {
@@ -729,69 +637,18 @@
   // Event delegation: popup content được Leaflet tạo động nên gắn listener trên document
   document.addEventListener("click", (e) => {
     const img = e.target.closest("img[data-gallery]");
-    if (img) {
-      try {
-        const images = JSON.parse(decodeURIComponent(img.dataset.gallery));
-        const index = parseInt(img.dataset.index, 10) || 0;
-        openLightbox(images, index);
-      } catch (err) {
-        console.error("Lightbox parse error", err);
-      }
-      return;
-    }
-
-    // Click vào video tile (thumbnail hoặc nút play)
-    const tile = e.target.closest(".video-tile");
-    if (tile) {
-      openVideoLightbox(tile.dataset.videoType, tile.dataset.videoId, tile.dataset.videoUrl);
+    if (!img) return;
+    try {
+      const images = JSON.parse(decodeURIComponent(img.dataset.gallery));
+      const index = parseInt(img.dataset.index, 10) || 0;
+      openLightbox(images, index);
+    } catch (err) {
+      console.error("Lightbox parse error", err);
     }
   });
 
-  // ---------------------------------------------------------------
-  // Video lightbox — dùng lại khung #lightbox, swap nội dung thành player
-  // ---------------------------------------------------------------
-  function openVideoLightbox(type, videoId, originalUrl) {
-    const lb = document.getElementById("lightbox");
-    const lbImg = document.getElementById("lb-img");
-    const lbNav = lb.querySelector(".lb-nav");
-
-    lbImg.style.display = "none";
-    lbNav.style.display = "none";
-
-    let existingPlayer = lb.querySelector(".video-player-container");
-    if (existingPlayer) existingPlayer.remove();
-
-    const container = document.createElement("div");
-    container.className = "video-player-container";
-
-    if (type === "youtube") {
-      container.innerHTML = `<iframe
-        src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0"
-        frameborder="0"
-        allow="autoplay; fullscreen; picture-in-picture"
-        allowfullscreen
-        style="width:min(88vw,1000px);height:min(50vw,560px);border-radius:10px;">
-      </iframe>`;
-    } else if (type === "drive") {
-      container.innerHTML = `<iframe
-        src="https://drive.google.com/file/d/${videoId}/preview"
-        frameborder="0"
-        allow="autoplay; fullscreen"
-        allowfullscreen
-        style="width:min(88vw,1000px);height:min(50vw,560px);border-radius:10px;">
-      </iframe>`;
-    }
-
-    lb.insertBefore(container, lbNav);
-    lb.classList.add("open");
-    lb.dataset.mode = "video";
-    document.body.style.overflow = "hidden";
-  }
-
-  function cleanupVideoLightbox() {
-    // Hàm này không cần nữa vì closeLightbox đã xử lý — giữ để tương thích
-    closeLightbox();
-  }
+  // Tự động ẩn/hiện lớp Cây trồng khi người dùng zoom vào/ra
+  map.on("zoomend", applyCayTrongZoomVisibility);
 
   // ---------------------------------------------------------------
   // Chỉ số mức zoom hiện tại — đặt ngay dưới control +/- của Leaflet
