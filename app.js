@@ -210,6 +210,55 @@
     return `https://drive.google.com/uc?export=view&id=${m[1]}`;
   }
 
+  // ---------------------------------------------------------------
+  // Video helpers — hỗ trợ YouTube và Google Drive
+  // ---------------------------------------------------------------
+  function detectVideoType(url) {
+    if (!url) return null;
+    const t = url.trim();
+    if (t.match(/youtube\.com\/watch|youtu\.be\//)) return "youtube";
+    if (t.match(/drive\.google\.com\/file\/d\//)) return "drive";
+    return null;
+  }
+
+  function getYouTubeId(url) {
+    const m = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null;
+  }
+
+  function parseVideoList(str) {
+    if (!str) return [];
+    return str.split(";").map((s) => s.trim()).filter(Boolean)
+              .filter((u) => detectVideoType(u) !== null);
+  }
+
+  function buildVideoGalleryHTML(videos, groupId) {
+    if (!videos || videos.length === 0) return "";
+    const tiles = videos.slice(0, 6).map((url, idx) => {
+      const type = detectVideoType(url);
+      if (type === "youtube") {
+        const vid = getYouTubeId(url);
+        if (!vid) return "";
+        const thumb = `https://img.youtube.com/vi/${vid}/mqdefault.jpg`;
+        return `<div class="video-tile" data-video-type="youtube" data-video-id="${vid}" data-video-url="${escapeHTML(url)}">
+          <img src="${thumb}" alt="" loading="lazy">
+          <div class="video-play-btn">▶</div>
+        </div>`;
+      }
+      if (type === "drive") {
+        const dm = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+        if (!dm) return "";
+        return `<div class="video-tile video-tile--drive" data-video-type="drive" data-video-id="${dm[1]}" data-video-url="${escapeHTML(url)}">
+          <div class="video-drive-icon">📹</div>
+          <div class="video-play-btn">▶</div>
+        </div>`;
+      }
+      return "";
+    }).join("");
+    if (!tiles.trim()) return "";
+    return `<div class="video-gallery">${tiles}</div>`;
+  }
+
   function getOrCreateLayerEntry(layerName, kind, defaultColor) {
     if (!layerRegistry.has(layerName)) {
       layerRegistry.set(layerName, {
@@ -248,6 +297,8 @@
 
         const images = parseImageList(r.AnhURLs || r.AnhURL);
         const galleryHtml = buildGalleryHTML(images, "DD-" + (r.ID || layerName));
+        const videos = parseVideoList(r.VideoURLs || "");
+        const videoHtml = buildVideoGalleryHTML(videos, "DD-" + (r.ID || layerName));
         const phoneHtml = r.SDT
           ? `<div class="popup-row"><b>Điện thoại:</b> ${escapeHTML(r.SDT)}</div>`
           : "";
@@ -263,6 +314,7 @@
           ${phoneHtml}
           ${descHtml}
           ${galleryHtml}
+          ${videoHtml}
         `);
 
         entry.group.addLayer(marker);
@@ -356,6 +408,8 @@
         const descHtml = r.MoTa ? `<div class="popup-desc">${escapeHTML(r.MoTa)}</div>` : "";
         const images = parseImageList(r.AnhURLs);
         const galleryHtml = buildGalleryHTML(images, "VT-" + (r.ID || layerName));
+        const videos = parseVideoList(r.VideoURLs || "");
+        const videoHtml = buildVideoGalleryHTML(videos, "VT-" + (r.ID || layerName));
         const orthoHtml = buildOrthoButtonHTML(r.ID);
 
         polygon.bindPopup(`
@@ -365,6 +419,7 @@
           ${cropHtml}
           ${descHtml}
           ${galleryHtml}
+          ${videoHtml}
           ${orthoHtml}
         `);
 
@@ -611,6 +666,14 @@
   }
 
   function closeLightbox() {
+    // Dọn video player nếu đang ở mode video
+    if (lightbox.dataset.mode === "video") {
+      lightbox.querySelector(".video-player-container")?.remove();
+      lbImg.style.display = "";
+      lightbox.querySelector(".lb-nav").style.display = "";
+      delete lightbox.dataset.mode;
+      document.body.style.overflow = "";
+    }
     lightbox.classList.remove("open");
     lbImg.src = "";
   }
@@ -636,16 +699,51 @@
 
   // Event delegation: popup content được Leaflet tạo động nên gắn listener trên document
   document.addEventListener("click", (e) => {
+    // Click ảnh gallery
     const img = e.target.closest("img[data-gallery]");
-    if (!img) return;
-    try {
-      const images = JSON.parse(decodeURIComponent(img.dataset.gallery));
-      const index = parseInt(img.dataset.index, 10) || 0;
-      openLightbox(images, index);
-    } catch (err) {
-      console.error("Lightbox parse error", err);
+    if (img) {
+      try {
+        const images = JSON.parse(decodeURIComponent(img.dataset.gallery));
+        const index = parseInt(img.dataset.index, 10) || 0;
+        openLightbox(images, index);
+      } catch (err) {
+        console.error("Lightbox parse error", err);
+      }
+      return;
+    }
+    // Click video tile
+    const tile = e.target.closest(".video-tile");
+    if (tile) {
+      openVideoLightbox(tile.dataset.videoType, tile.dataset.videoId);
     }
   });
+
+  // ---------------------------------------------------------------
+  // Video lightbox — dùng lại khung #lightbox, swap nội dung thành player
+  // ---------------------------------------------------------------
+  function openVideoLightbox(type, videoId) {
+    const lb = lightbox;
+    // Ẩn ảnh + nav, chèn iframe player
+    lbImg.style.display = "none";
+    lb.querySelector(".lb-nav").style.display = "none";
+    lb.querySelector(".video-player-container")?.remove();
+
+    const container = document.createElement("div");
+    container.className = "video-player-container";
+
+    const src = type === "youtube"
+      ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`
+      : `https://drive.google.com/file/d/${videoId}/preview`;
+
+    container.innerHTML = `<iframe src="${src}" frameborder="0"
+      allow="autoplay; fullscreen; picture-in-picture" allowfullscreen
+      style="width:min(88vw,1000px);height:min(50vw,560px);border-radius:10px;"></iframe>`;
+
+    lb.insertBefore(container, lb.querySelector(".lb-nav"));
+    lb.dataset.mode = "video";
+    lb.classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
 
   // Tự động ẩn/hiện lớp Cây trồng khi người dùng zoom vào/ra
   map.on("zoomend", applyCayTrongZoomVisibility);
