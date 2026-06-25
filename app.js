@@ -15,13 +15,28 @@
   };
 
   // ---------------------------------------------------------------
-  // Map setup
+  // Map setup — tâm và zoom lấy từ URL params nếu có, fallback về config
+  // Ví dụ: ?lat=22.3488&lng=105.8244&zoom=14
   // ---------------------------------------------------------------
+  function getInitialView() {
+    const params = new URLSearchParams(window.location.search);
+    const lat = parseFloat(params.get("lat"));
+    const lng = parseFloat(params.get("lng"));
+    const zoom = parseInt(params.get("zoom"), 10);
+    const validLatLng = !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    const validZoom = !isNaN(zoom) && zoom >= 1 && zoom <= 22;
+    return {
+      center: validLatLng ? [lat, lng] : MAP_CONFIG.DEFAULT_CENTER,
+      zoom: validZoom ? zoom : MAP_CONFIG.DEFAULT_ZOOM,
+    };
+  }
+
+  const initialView = getInitialView();
   const map = L.map("map", {
     zoomControl: true,
     minZoom: 5,
     maxZoom: 19,
-  }).setView(MAP_CONFIG.DEFAULT_CENTER, MAP_CONFIG.DEFAULT_ZOOM);
+  }).setView(initialView.center, initialView.zoom);
 
   const baseLayers = {
     "Bản đồ thường": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
