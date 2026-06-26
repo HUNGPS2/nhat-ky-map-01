@@ -28,6 +28,7 @@
     return {
       center: validLatLng ? [lat, lng] : MAP_CONFIG.DEFAULT_CENTER,
       zoom: validZoom ? zoom : MAP_CONFIG.DEFAULT_ZOOM,
+      hasUrlView: validLatLng, // true = người dùng đã chỉ định tọa độ → không auto-fit
     };
   }
 
@@ -633,7 +634,7 @@
       } else {
         els.emptyState.style.display = "none";
         setStatus("ok", `Cập nhật lúc ${formatTime(new Date())}`);
-        if (isFirstLoad) fitToAllLayers();
+        if (isFirstLoad && !initialView.hasUrlView) fitToAllLayers();
       }
     } catch (err) {
       console.error(err);
