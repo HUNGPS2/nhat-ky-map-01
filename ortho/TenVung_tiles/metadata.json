@@ -1,0 +1,13 @@
+{
+  "name": "New folder (2)",
+  "version": "1.1.0",
+  "description": "",
+  "attribution": "<a href=\"https://www.maptiler.com/engine/\">Rendered with MapTiler Engine</a>, non-commercial use only",
+  "type": "overlay",
+  "format": "png",
+  "minzoom": "16",
+  "maxzoom": "21",
+  "scale": "1.000000",
+  "bounds": [106.14028919, 20.78086032, 106.14315185, 20.78317163],
+  "profile": "mercator"
+}
