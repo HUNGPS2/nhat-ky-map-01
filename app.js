@@ -365,19 +365,35 @@
       .forEach((r) => {
         const north = parseFloat(r.BoundsNorth);
         const south = parseFloat(r.BoundsSouth);
-        const east = parseFloat(r.BoundsEast);
-        const west = parseFloat(r.BoundsWest);
+        const east  = parseFloat(r.BoundsEast);
+        const west  = parseFloat(r.BoundsWest);
         if ([north, south, east, west].some((v) => isNaN(v))) return;
-        if (!r.ImageURL) return;
+
+        const tileUrl  = (r.TileURL  || "").trim();
+        const imageUrl = (r.ImageURL || "").trim();
+        const thumbUrl = (r.ThumbURL || "").trim();
+
+        // Cần ít nhất 1 trong 2: TileURL hoặc ImageURL
+        if (!tileUrl && !imageUrl) return;
+
+        // Xác định chế độ hiển thị
+        const displayMode = tileUrl ? "tile" : "image";
+
+        // Thumbnail: dùng ThumbURL nếu có, fallback về ImageURL (không dùng TileURL làm thumb)
+        const thumbResolved = thumbUrl
+          ? toDirectImageURL(thumbUrl)
+          : (imageUrl ? toDirectImageURL(imageUrl) : null);
 
         orthoRegistry.set(r.VungID, {
-          id: r.ID,
-          vungId: r.VungID,
-          tenLop: r.TenLop || "Orthomosaic",
-          imageUrl: toDirectImageURL(r.ImageURL),
-          thumbUrl: r.ThumbURL ? toDirectImageURL(r.ThumbURL) : toDirectImageURL(r.ImageURL),
-          bounds: { north, south, east, west },
-          doPhanGiai: r.DoPhanGiai_cm || "",
+          id:          r.ID,
+          vungId:      r.VungID,
+          tenLop:      r.TenLop || "Orthomosaic",
+          displayMode, // "tile" hoặc "image"
+          tileUrl,
+          imageUrl:    imageUrl ? toDirectImageURL(imageUrl) : "",
+          thumbUrl:    thumbResolved,
+          bounds:      { north, south, east, west },
+          doPhanGiai:  r.DoPhanGiai_cm || "",
         });
       });
   }
@@ -385,11 +401,25 @@
   function buildOrthoButtonHTML(vungId) {
     const ortho = orthoRegistry.get(vungId);
     if (!ortho) return "";
+
+    const ico   = ortho.displayMode === "tile" ? "🛰️" : "🖼️";
+    const label = ortho.displayMode === "tile"
+      ? "Xem ảnh chi tiết (Tile HD)"
+      : "Xem ảnh orthomosaic";
+    const subLabel = ortho.displayMode === "tile"
+      ? `<div style="font-size:10.5px;color:#7a9a3d;font-weight:400;margin-top:2px;">Zoom sâu đến từng cây</div>`
+      : `<div style="font-size:10.5px;color:#8b9186;font-weight:400;margin-top:2px;">Ảnh tổng quan</div>`;
+
+    const thumbHtml = ortho.thumbUrl
+      ? `<img class="ortho-thumb-preview" src="${escapeHTML(ortho.thumbUrl)}" loading="lazy" alt=""
+             onclick="window.__openOrthoViewer('${escapeHTML(vungId)}')">`
+      : "";
+
     return `
-      <img class="ortho-thumb-preview" src="${escapeHTML(ortho.thumbUrl)}" loading="lazy" alt=""
-           onclick="window.__openOrthoViewer('${escapeHTML(vungId)}')">
+      ${thumbHtml}
       <button class="ortho-btn" onclick="window.__openOrthoViewer('${escapeHTML(vungId)}')">
-        <span class="ortho-ico">🛰️</span> Xem ảnh chi tiết (Orthomosaic)
+        <span class="ortho-ico">${ico}</span>
+        <div><div>${label}</div>${subLabel}</div>
       </button>
     `;
   }
@@ -806,6 +836,7 @@
 
   let orthoMap = null;
   let orthoImageLayer = null;
+  let orthoBaseLayer = null; // nền OSM bên dưới tile orthomosaic
 
   function openOrthoViewer(vungId) {
     const ortho = orthoRegistry.get(vungId);
@@ -814,49 +845,73 @@
       return;
     }
 
+    // Cập nhật tiêu đề viewer
     orthoViewerTitle.textContent = ortho.tenLop + (vungId ? ` — ${vungId}` : "");
-    orthoViewerSub.textContent = ortho.doPhanGiai
-      ? `Độ phân giải ~${ortho.doPhanGiai}cm/pixel`
-      : "Ảnh chụp độ phân giải cao";
+    const modeLabel = ortho.displayMode === "tile"
+      ? (ortho.doPhanGiai ? `Tile HD ~${ortho.doPhanGiai}cm/pixel · Zoom sâu để xem từng cây` : "Tile HD · Zoom sâu để xem từng cây")
+      : (ortho.doPhanGiai ? `Ảnh tổng quan ~${ortho.doPhanGiai}cm/pixel` : "Ảnh tổng quan");
+    orthoViewerSub.textContent = modeLabel;
 
     orthoViewerEl.classList.add("open");
     document.body.style.overflow = "hidden";
 
     const b = ortho.bounds;
-    const leafletBounds = [
-      [b.south, b.west],
-      [b.north, b.east],
-    ];
+    const leafletBounds = [[b.south, b.west], [b.north, b.east]];
 
-    // Khởi tạo map riêng cho viewer chỉ 1 lần, các lần sau tái sử dụng
+    // Khởi tạo map viewer 1 lần
     if (!orthoMap) {
       orthoMap = L.map("ortho-map", {
         crs: L.CRS.EPSG3857,
         minZoom: 10,
         maxZoom: 24,
         zoomControl: true,
-        attributionControl: false,
+        attributionControl: true,
       });
+      // Thêm nền OSM mờ làm context (đặc biệt hữu ích khi tile chưa load hết)
+      orthoBaseLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        { opacity: 0.3, maxZoom: 24, attribution: "© OSM" }
+      ).addTo(orthoMap);
     }
 
+    // Xóa layer cũ trước khi thêm mới
     if (orthoImageLayer) {
       orthoMap.removeLayer(orthoImageLayer);
+      orthoImageLayer = null;
     }
 
-    orthoImageLayer = L.imageOverlay(ortho.imageUrl, leafletBounds, {
-      interactive: false,
-    }).addTo(orthoMap);
+    if (ortho.displayMode === "tile") {
+      // --- Chế độ TILE HD: zoom sâu, chi tiết từng cây ---
+      orthoImageLayer = L.tileLayer(ortho.tileUrl, {
+        minZoom: 10,
+        maxZoom: 24,
+        tms: false,       // WebODM export XYZ (không phải TMS ngược) — đổi thành true nếu ảnh bị lật
+        opacity: 1,
+        attribution: "Orthomosaic © CPART",
+        errorTileUrl: "", // tile lỗi hiện trong suốt thay vì icon vỡ
+      }).addTo(orthoMap);
 
-    // Cho phép kéo/zoom tự do nhưng giới hạn không trôi quá xa khỏi ảnh
-    const padded = L.latLngBounds(leafletBounds).pad(0.6);
-    orthoMap.setMaxBounds(padded);
+      // Zoom về mức 18 để thấy chi tiết ngay khi mở
+      requestAnimationFrame(() => {
+        orthoMap.invalidateSize();
+        const center = L.latLngBounds(leafletBounds).getCenter();
+        orthoMap.setView(center, 18);
+        orthoMap.setMaxBounds(L.latLngBounds(leafletBounds).pad(1.0));
+      });
 
-    // Đợi viewer hiện ra (display:flex áp dụng) rồi mới invalidateSize + fitBounds,
-    // vì Leaflet cần kích thước container đã render xong để tính đúng
-    requestAnimationFrame(() => {
-      orthoMap.invalidateSize();
-      orthoMap.fitBounds(leafletBounds, { padding: [20, 20] });
-    });
+    } else {
+      // --- Chế độ IMAGE: JPG tổng quan, dùng imageOverlay ---
+      orthoImageLayer = L.imageOverlay(ortho.imageUrl, leafletBounds, {
+        interactive: false,
+        opacity: 1,
+      }).addTo(orthoMap);
+
+      requestAnimationFrame(() => {
+        orthoMap.invalidateSize();
+        orthoMap.fitBounds(leafletBounds, { padding: [20, 20] });
+        orthoMap.setMaxBounds(L.latLngBounds(leafletBounds).pad(0.6));
+      });
+    }
   }
 
   function showEmptyOrthoNotice() {
