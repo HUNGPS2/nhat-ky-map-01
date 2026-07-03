@@ -349,6 +349,12 @@
   .leaflet-control-zoom{margin-top:0 !important;}
   .leaflet-draw.leaflet-control{margin-top:0 !important;}
   .leaflet-top.leaflet-right{top:64px !important;}
+  .locate-control .locate-btn{
+    width:30px;height:30px;line-height:30px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;background:#fff;text-decoration:none;
+  }
+  .locate-control .locate-btn:hover{background:#f4f4f4;}
 
   #zoom-indicator{
     position:absolute;z-index:1000;
@@ -441,12 +447,16 @@
   <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 <script src="measure-area-module.js"></script>
+<script src="locate-me-module.js"></script>
 <script>
   const areaTool = initAreaMeasureTool(window.CPART_MAP, {
     sheetWebhookUrl: 'https://script.google.com/macros/s/AKfycbzqWeHxdxRRc8IEKyXsTI2OyEs_9o5r9GmYYmT9YVFNwfKJ7PktArQheY7Q-uWk1anV/exec' // URL sau khi deploy Apps Script
   });
   // Tùy chọn: load lại các lô đất đã lưu khi mở trang
   areaTool.loadSavedPolygons('https://script.google.com/macros/s/AKfycbzqWeHxdxRRc8IEKyXsTI2OyEs_9o5r9GmYYmT9YVFNwfKJ7PktArQheY7Q-uWk1anV/exec');
+
+  // Nút định vị vị trí hiện tại của thiết bị
+  initLocateMeControl(window.CPART_MAP, { zoomLevel: 18 });
 </script>
 </body>
 </html>
