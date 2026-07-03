@@ -49,6 +49,16 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
       maxZoom: 17,
     }),
+    "Địa hình Google (Terrain)": L.tileLayer("https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}", {
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+      attribution: "Map data &copy; Google",
+      maxZoom: 20,
+    }),
+    "Vệ tinh Google (Satellite)": L.tileLayer("https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+      attribution: "Map data &copy; Google",
+      maxZoom: 20,
+    }),
   };
 
   baseLayers["Bản đồ thường"].addTo(map);
