@@ -51,17 +51,21 @@ function initAreaMeasureTool(map, options) {
     const geojson = layer.toGeoJSON();
     const areaM2 = turf.area(geojson); // m²
     const areaHa = areaM2 / 10000;
-    const areaCong = areaM2 / 1000; // 1 công (Nam Bộ) ≈ 1.000 m² (tùy vùng, có thể chỉnh)
+    const areaCong = areaM2 / 1000; // 1 công (Nam Bộ) ≈ 1.000 m²
+    const areaSaoBac = areaM2 / 360; // 1 sào Bắc Bộ = 360 m²
+    const areaSaoTrung = areaM2 / 500; // 1 sào Trung Bộ = 500 m²
     const line = turf.polygonToLine(geojson);
     const perimeterM = turf.length(line, { units: 'kilometers' }) * 1000;
-    return { areaM2, areaHa, areaCong, perimeterM, geojson };
+    return { areaM2, areaHa, areaCong, areaSaoBac, areaSaoTrung, perimeterM, geojson };
   }
 
   function formatArea(stats) {
     return (
       `<b>Diện tích:</b> ${stats.areaM2.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} m²<br>` +
       `≈ ${stats.areaHa.toLocaleString('vi-VN', { maximumFractionDigits: 3 })} ha<br>` +
-      `≈ ${stats.areaCong.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} công<br>` +
+      `≈ ${stats.areaCong.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} công (Nam Bộ)<br>` +
+      `≈ ${stats.areaSaoBac.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} sào (Bắc Bộ)<br>` +
+      `≈ ${stats.areaSaoTrung.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} sào (Trung Bộ)<br>` +
       `<b>Chu vi:</b> ${stats.perimeterM.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} m`
     );
   }
@@ -113,6 +117,8 @@ function initAreaMeasureTool(map, options) {
       area_m2: Math.round(stats.areaM2 * 100) / 100,
       area_ha: Math.round(stats.areaHa * 10000) / 10000,
       area_cong: Math.round(stats.areaCong * 100) / 100,
+      area_sao_bac: Math.round(stats.areaSaoBac * 100) / 100,
+      area_sao_trung: Math.round(stats.areaSaoTrung * 100) / 100,
       perimeter_m: Math.round(stats.perimeterM * 100) / 100,
       geojson: JSON.stringify(stats.geojson.geometry),
       created_at: new Date().toISOString()
@@ -155,7 +161,11 @@ function initAreaMeasureTool(map, options) {
         const layer = L.geoJSON(geometry, { style: { color: '#3388ff', weight: 2, fillOpacity: 0.1 } });
         layer.eachLayer((l) => {
           l.bindTooltip(row.name, { permanent: true, direction: 'center', className: 'area-label' });
-          l.bindPopup(`<b>${row.name}</b><br>Diện tích: ${Number(row.area_m2).toLocaleString('vi-VN')} m²`);
+          l.bindPopup(
+            `<b>${row.name}</b><br>` +
+            `Diện tích: ${Number(row.area_m2).toLocaleString('vi-VN')} m²<br>` +
+            `≈ ${Number(row.area_sao_bac).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} sào (Bắc Bộ)`
+          );
         });
         drawnItems.addLayer(layer);
       } catch (err) {

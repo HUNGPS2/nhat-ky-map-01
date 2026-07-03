@@ -6,7 +6,7 @@
  * Copy URL /exec sau khi deploy vào sheetWebhookUrl ở file JS.
  *
  * Sheet cần có các cột theo đúng thứ tự (dòng 1 là header):
- * name | area_m2 | area_ha | area_cong | perimeter_m | geojson | created_at
+ * name | area_m2 | area_ha | area_cong | area_sao_bac | area_sao_trung | perimeter_m | geojson | created_at
  */
 
 const SHEET_NAME = 'LoDat'; // đổi theo tên sheet của bạn
@@ -18,13 +18,15 @@ function doPost(e) {
     let sheet = ss.getSheetByName(SHEET_NAME);
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_NAME);
-      sheet.appendRow(['name', 'area_m2', 'area_ha', 'area_cong', 'perimeter_m', 'geojson', 'created_at']);
+      sheet.appendRow(['name', 'area_m2', 'area_ha', 'area_cong', 'area_sao_bac', 'area_sao_trung', 'perimeter_m', 'geojson', 'created_at']);
     }
     sheet.appendRow([
       data.name,
       data.area_m2,
       data.area_ha,
       data.area_cong,
+      data.area_sao_bac,
+      data.area_sao_trung,
       data.perimeter_m,
       data.geojson,
       data.created_at
