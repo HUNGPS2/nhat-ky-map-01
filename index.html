@@ -440,11 +440,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 <script src="measure-area-module.js"></script>
 <script>
-  const areaTool = initAreaMeasureTool(map, {
+  const areaTool = initAreaMeasureTool(window.CPART_MAP, {
     sheetWebhookUrl: 'https://script.google.com/macros/s/AKfycbzqWeHxdxRRc8IEKyXsTI2OyEs_9o5r9GmYYmT9YVFNwfKJ7PktArQheY7Q-uWk1anV/exec' // URL sau khi deploy Apps Script
   });
   // Tùy chọn: load lại các lô đất đã lưu khi mở trang
-  areaTool.loadSavedPolygons('https://script.google.com/macros/s/XXXX/exec');
+  areaTool.loadSavedPolygons('https://script.google.com/macros/s/AKfycbzqWeHxdxRRc8IEKyXsTI2OyEs_9o5r9GmYYmT9YVFNwfKJ7PktArQheY7Q-uWk1anV/exec');
 </script>
 </body>
 </html>
