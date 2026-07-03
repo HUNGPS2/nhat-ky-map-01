@@ -38,7 +38,7 @@
     minZoom: 5,
     maxZoom: 19,
   }).setView(initialView.center, initialView.zoom);
-
+window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập được biến map
   const baseLayers = {
     "Bản đồ thường": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
