@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 <meta charset="UTF-8">
 <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
-<title>Bản đồ vùng nguyên liệu &amp; cơ sở CPART</title>
+<title>Bản đồ điện tử vùng CPART</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <style>
   :root{
@@ -435,5 +436,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<script src="measure-area-module.js"></script>
+<script>
+  const areaTool = initAreaMeasureTool(map, {
+    sheetWebhookUrl: 'https://script.google.com/macros/s/XXXX/exec' // URL sau khi deploy Apps Script
+  });
+  // Tùy chọn: load lại các lô đất đã lưu khi mở trang
+  areaTool.loadSavedPolygons('https://script.google.com/macros/s/XXXX/exec');
+</script>
 </body>
 </html>
