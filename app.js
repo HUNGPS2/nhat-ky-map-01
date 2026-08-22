@@ -186,6 +186,12 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
       .replace(/>/g, "&gt;");
   }
 
+  // Trên màn hình nhỏ (điện thoại) dùng Bottom Sheet thay cho popup nổi của Leaflet,
+  // vì popup nổi rất dễ bị các thành phần cố định (topbar, layer-panel) che mất.
+  function isMobileViewport() {
+    return window.matchMedia("(max-width: 640px)").matches;
+  }
+
   function colorForLayer(layerName, fallback) {
     return (MAP_CONFIG.LAYER_COLORS && MAP_CONFIG.LAYER_COLORS[layerName]) || fallback;
   }
@@ -340,7 +346,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           : "";
         const descHtml = r.MoTa ? `<div class="popup-desc">${escapeHTML(r.MoTa)}</div>` : "";
 
-        marker.bindPopup(`
+        const popupHtml = `
           <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
           <div class="popup-title">${escapeHTML(r.TenDiaDiem || "(Chưa đặt tên)")}</div>
           ${addrHtml}
@@ -348,7 +354,16 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ${descHtml}
           ${galleryHtml}
           ${videoHtml}
-        `);
+        `;
+
+        if (isMobileViewport()) {
+          marker.on("click", (e) => {
+            L.DomEvent.stopPropagation(e); // tránh click lọt xuống map làm đóng sheet ngay lập tức
+            openBottomSheet(popupHtml);
+          });
+        } else {
+          marker.bindPopup(popupHtml);
+        }
 
         entry.group.addLayer(marker);
       });
@@ -475,7 +490,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         const videoHtml = buildVideoGalleryHTML(videos, "VT-" + (r.ID || layerName));
         const orthoHtml = buildOrthoButtonHTML(r.ID);
 
-        polygon.bindPopup(`
+        const popupHtml = `
           <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
           <div class="popup-title">${escapeHTML(r.TenVung || "(Chưa đặt tên)")}</div>
           ${areaHtml}
@@ -484,7 +499,16 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ${galleryHtml}
           ${videoHtml}
           ${orthoHtml}
-        `);
+        `;
+
+        if (isMobileViewport()) {
+          polygon.on("click", (e) => {
+            L.DomEvent.stopPropagation(e);
+            openBottomSheet(popupHtml);
+          });
+        } else {
+          polygon.bindPopup(popupHtml);
+        }
 
         entry.group.addLayer(polygon);
       });
@@ -530,7 +554,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         const descHtml = r.GhiChu ? `<div class="popup-desc">${escapeHTML(r.GhiChu)}</div>` : "";
         const orthoHtmlTree = buildOrthoButtonHTML(r.VungID);
 
-        marker.bindPopup(`
+        const popupHtml = `
           <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
           <div class="popup-title">${escapeHTML(r.LoaiCay || "(Chưa rõ loại)")}</div>
           ${vungHtml}
@@ -539,7 +563,16 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ${nguonHtml}
           ${descHtml}
           ${orthoHtmlTree}
-        `);
+        `;
+
+        if (isMobileViewport()) {
+          marker.on("click", (e) => {
+            L.DomEvent.stopPropagation(e);
+            openBottomSheet(popupHtml);
+          });
+        } else {
+          marker.bindPopup(popupHtml);
+        }
 
         entry.group.addLayer(marker);
       });
@@ -807,6 +840,124 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     lb.classList.add("open");
     document.body.style.overflow = "hidden";
   }
+
+  // ---------------------------------------------------------------
+  // Bottom Sheet — popup dạng kéo lên/xuống kiểu Google Maps (chỉ dùng trên mobile)
+  // 3 mức: đóng hẳn (dưới màn hình) / "peek" ~42% màn hình / mở rộng ~85% màn hình
+  // Bản đồ luôn còn nhìn thấy phía trên, kéo tay cầm để mở rộng/thu nhỏ/đóng.
+  // ---------------------------------------------------------------
+  const bottomSheet = document.getElementById("bottom-sheet");
+  const bottomSheetContent = document.getElementById("bottom-sheet-content");
+  const bottomSheetScrim = document.getElementById("bottom-sheet-scrim");
+  const bottomSheetHandle = document.getElementById("bottom-sheet-handle-area");
+  const bottomSheetCloseBtn = document.getElementById("bottom-sheet-close");
+
+  const BS_PEEK_RATIO = 0.42;     // mức mở mặc định — vẫn thấy phần lớn bản đồ
+  const BS_EXPANDED_RATIO = 0.85; // mức mở rộng tối đa khi kéo lên hết cỡ
+
+  let bsSheetHeightPx = 0;
+  let bsPeekY = 0;
+  let bsExpandedY = 0;
+  let bsClosedY = 0;
+  let bsCurrentY = 0;
+  let bsDragStartClientY = null;
+  let bsDragStartTranslate = 0;
+  let bsIsOpen = false;
+
+  function bsRecalc() {
+    bsSheetHeightPx = window.innerHeight * BS_EXPANDED_RATIO;
+    bottomSheet.style.height = bsSheetHeightPx + "px";
+    bsExpandedY = 0;
+    bsPeekY = bsSheetHeightPx - window.innerHeight * BS_PEEK_RATIO;
+    bsClosedY = bsSheetHeightPx;
+  }
+
+  function bsSetTransform(y, animate) {
+    bottomSheet.classList.toggle("dragging", !animate);
+    bottomSheet.style.transform = `translateY(${y}px)`;
+    bsCurrentY = y;
+  }
+
+  function openBottomSheet(html) {
+    bsRecalc();
+    bottomSheetContent.innerHTML = html;
+    bottomSheetContent.scrollTop = 0;
+    bottomSheetScrim.classList.add("open");
+    bsSetTransform(bsPeekY, true); // luôn mở ở mức "peek", người dùng có thể kéo lên thêm
+    bsIsOpen = true;
+    document.getElementById("zoom-indicator").style.display = "none";
+  }
+
+  function closeBottomSheet() {
+    if (!bsIsOpen) return;
+    bsSetTransform(bsClosedY, true);
+    bottomSheetScrim.classList.remove("open");
+    bsIsOpen = false;
+    document.getElementById("zoom-indicator").style.display = "";
+  }
+
+  function bsDragStart(clientY) {
+    bsDragStartClientY = clientY;
+    bsDragStartTranslate = bsCurrentY;
+    bottomSheet.classList.add("dragging");
+  }
+
+  function bsDragMove(clientY) {
+    if (bsDragStartClientY === null) return;
+    const delta = clientY - bsDragStartClientY;
+    const next = Math.max(bsExpandedY, Math.min(bsClosedY, bsDragStartTranslate + delta));
+    bsSetTransform(next, false);
+  }
+
+  function bsDragEnd() {
+    if (bsDragStartClientY === null) return;
+    bottomSheet.classList.remove("dragging");
+    const y = bsCurrentY;
+    const distExpanded = Math.abs(y - bsExpandedY);
+    const distPeek = Math.abs(y - bsPeekY);
+    const distClosed = Math.abs(y - bsClosedY);
+    const minDist = Math.min(distExpanded, distPeek, distClosed);
+    if (minDist === distClosed) {
+      closeBottomSheet();
+    } else if (minDist === distExpanded) {
+      bsSetTransform(bsExpandedY, true);
+    } else {
+      bsSetTransform(bsPeekY, true);
+    }
+    bsDragStartClientY = null;
+  }
+
+  bottomSheetHandle.addEventListener("touchstart", (e) => bsDragStart(e.touches[0].clientY), { passive: true });
+  bottomSheetHandle.addEventListener("touchmove", (e) => bsDragMove(e.touches[0].clientY), { passive: true });
+  bottomSheetHandle.addEventListener("touchend", bsDragEnd);
+
+  let bsMouseDragging = false;
+  bottomSheetHandle.addEventListener("mousedown", (e) => {
+    bsMouseDragging = true;
+    bsDragStart(e.clientY);
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (bsMouseDragging) bsDragMove(e.clientY);
+  });
+  window.addEventListener("mouseup", () => {
+    if (bsMouseDragging) {
+      bsMouseDragging = false;
+      bsDragEnd();
+    }
+  });
+
+  bottomSheetCloseBtn.addEventListener("click", closeBottomSheet);
+  bottomSheetScrim.addEventListener("click", closeBottomSheet);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && bsIsOpen) closeBottomSheet();
+  });
+  window.addEventListener("resize", () => {
+    if (bsIsOpen) bsRecalc();
+  });
+  // Chạm ra ngoài (lên nền bản đồ) cũng đóng sheet, giống hành vi Google Maps
+  map.on("click", () => {
+    if (bsIsOpen) closeBottomSheet();
+  });
 
   // Tự động ẩn/hiện lớp Cây trồng khi người dùng zoom vào/ra
   map.on("zoomend", applyCayTrongZoomVisibility);
