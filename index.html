@@ -432,9 +432,21 @@
     display:flex;align-items:center;justify-content:center;
   }
 
+  /* Thanh kéo ngang phía trên — kéo lên/xuống để mở rộng hoặc thu nhỏ sheet */
+  #bottom-sheet-handle-area{
+    position:absolute;top:0;left:0;right:0;z-index:2;height:26px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:grab;touch-action:none;user-select:none;
+  }
+  #bottom-sheet-handle-area .bs-handle{
+    width:38px;height:5px;border-radius:999px;background:var(--line);
+    transition:background .15s;
+  }
+  #bottom-sheet-handle-area:active .bs-handle{background:var(--moss);}
+
   /* Thanh kéo dọc bên phải — kéo lên/xuống để mở rộng hoặc thu nhỏ sheet */
   #bottom-sheet-resize-handle{
-    position:absolute;top:0;bottom:0;right:0;z-index:2;
+    position:absolute;top:26px;bottom:0;right:0;z-index:2;
     width:28px;
     display:flex;align-items:center;justify-content:center;
     cursor:ns-resize;touch-action:none;user-select:none;
@@ -524,6 +536,9 @@
   <div id="bottom-sheet-scrim"></div>
   <div id="bottom-sheet">
     <button id="bottom-sheet-close" aria-label="Đóng">&times;</button>
+    <div id="bottom-sheet-handle-area" aria-label="Kéo để mở rộng hoặc thu nhỏ" title="Kéo để mở rộng/thu nhỏ">
+      <div class="bs-handle"></div>
+    </div>
     <div id="bottom-sheet-resize-handle" aria-label="Kéo để mở rộng hoặc thu nhỏ" title="Kéo để mở rộng/thu nhỏ">
       <div class="bs-vhandle"></div>
     </div>

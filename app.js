@@ -849,6 +849,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   const bottomSheet = document.getElementById("bottom-sheet");
   const bottomSheetContent = document.getElementById("bottom-sheet-content");
   const bottomSheetScrim = document.getElementById("bottom-sheet-scrim");
+  const bottomSheetHandle = document.getElementById("bottom-sheet-handle-area");
   const bottomSheetResizeHandle = document.getElementById("bottom-sheet-resize-handle");
   const bottomSheetCloseBtn = document.getElementById("bottom-sheet-close");
 
@@ -927,15 +928,19 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     bsDragStartClientY = null;
   }
 
-  bottomSheetResizeHandle.addEventListener("touchstart", (e) => bsDragStart(e.touches[0].clientY), { passive: true });
-  bottomSheetResizeHandle.addEventListener("touchmove", (e) => bsDragMove(e.touches[0].clientY), { passive: true });
-  bottomSheetResizeHandle.addEventListener("touchend", bsDragEnd);
+  function bsAttachDragEvents(el) {
+    el.addEventListener("touchstart", (e) => bsDragStart(e.touches[0].clientY), { passive: true });
+    el.addEventListener("touchmove", (e) => bsDragMove(e.touches[0].clientY), { passive: true });
+    el.addEventListener("touchend", bsDragEnd);
+    el.addEventListener("mousedown", (e) => {
+      bsMouseDragging = true;
+      bsDragStart(e.clientY);
+    });
+  }
 
   let bsMouseDragging = false;
-  bottomSheetResizeHandle.addEventListener("mousedown", (e) => {
-    bsMouseDragging = true;
-    bsDragStart(e.clientY);
-  });
+  bsAttachDragEvents(bottomSheetHandle);
+  bsAttachDragEvents(bottomSheetResizeHandle);
   window.addEventListener("mousemove", (e) => {
     if (bsMouseDragging) bsDragMove(e.clientY);
   });
