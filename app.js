@@ -39,6 +39,13 @@
     maxZoom: 19,
   }).setView(initialView.center, initialView.zoom);
 window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập được biến map
+
+  // Popup luôn tự pan tránh topbar (phía trên) và layer-panel (phía dưới) khi mở,
+  // đặc biệt quan trọng trên di động vì các thành phần này cố định và che nội dung popup
+  L.Popup.mergeOptions({
+    autoPanPaddingTopLeft: L.point(16, 110),
+    autoPanPaddingBottomRight: L.point(16, 260),
+  });
   const baseLayers = {
     "Bản đồ thường": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -815,6 +822,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     const rect = zoomControlEl.getBoundingClientRect();
     const mapRect = document.getElementById("map").getBoundingClientRect();
     zoomIndicator.style.top = (rect.bottom - mapRect.top + 8) + "px";
+    zoomIndicator.style.right = (mapRect.right - rect.right) + "px";
   }
 
   function updateZoomIndicator() {
@@ -834,6 +842,10 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     updateZoomIndicator();
   });
   window.addEventListener("resize", positionZoomIndicator);
+
+  // Ẩn chỉ số zoom khi có popup đang mở, tránh chồng chéo lên nội dung popup trên mobile
+  map.on("popupopen", () => { zoomIndicator.style.display = "none"; });
+  map.on("popupclose", () => { zoomIndicator.style.display = ""; });
 
   // ---------------------------------------------------------------
   // Orthomosaic full-screen viewer — Leaflet riêng, dùng imageOverlay
