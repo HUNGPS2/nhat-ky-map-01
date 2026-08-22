@@ -849,7 +849,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   const bottomSheet = document.getElementById("bottom-sheet");
   const bottomSheetContent = document.getElementById("bottom-sheet-content");
   const bottomSheetScrim = document.getElementById("bottom-sheet-scrim");
-  const bottomSheetHandle = document.getElementById("bottom-sheet-handle-area");
+  const bottomSheetResizeHandle = document.getElementById("bottom-sheet-resize-handle");
   const bottomSheetCloseBtn = document.getElementById("bottom-sheet-close");
 
   const BS_PEEK_RATIO = 0.42;     // mức mở mặc định — vẫn thấy phần lớn bản đồ
@@ -927,12 +927,12 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     bsDragStartClientY = null;
   }
 
-  bottomSheetHandle.addEventListener("touchstart", (e) => bsDragStart(e.touches[0].clientY), { passive: true });
-  bottomSheetHandle.addEventListener("touchmove", (e) => bsDragMove(e.touches[0].clientY), { passive: true });
-  bottomSheetHandle.addEventListener("touchend", bsDragEnd);
+  bottomSheetResizeHandle.addEventListener("touchstart", (e) => bsDragStart(e.touches[0].clientY), { passive: true });
+  bottomSheetResizeHandle.addEventListener("touchmove", (e) => bsDragMove(e.touches[0].clientY), { passive: true });
+  bottomSheetResizeHandle.addEventListener("touchend", bsDragEnd);
 
   let bsMouseDragging = false;
-  bottomSheetHandle.addEventListener("mousedown", (e) => {
+  bottomSheetResizeHandle.addEventListener("mousedown", (e) => {
     bsMouseDragging = true;
     bsDragStart(e.clientY);
   });
