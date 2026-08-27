@@ -574,6 +574,10 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ? `<div class="popup-row"><b>Nguồn dữ liệu:</b> ${escapeHTML(r.NguonDuLieu)}</div>`
           : "";
         const descHtml = r.GhiChu ? `<div class="popup-desc">${escapeHTML(r.GhiChu)}</div>` : "";
+        const images = parseImageList(r.AnhURLs || "");
+        const galleryHtml = buildGalleryHTML(images, "CAY-" + (r.ID || layerName));
+        const videos = parseVideoList(r.VideoURLs || "");
+        const videoHtml = buildVideoGalleryHTML(videos, "CAY-" + (r.ID || layerName));
         const orthoHtmlTree = buildOrthoButtonHTML(r.VungID);
 
         const popupHtml = `
@@ -584,6 +588,8 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ${accHtml}
           ${nguonHtml}
           ${descHtml}
+          ${galleryHtml}
+          ${videoHtml}
           ${orthoHtmlTree}
         `;
 
