@@ -68,7 +68,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     }),
   };
 
-  baseLayers["Vệ tinh Google (Satellite)"].addTo(map);
+  baseLayers["Bản đồ thường"].addTo(map);
 
   // layerName -> { group: L.LayerGroup, color: string, kind: 'marker'|'polygon', count: number }
   const layerRegistry = new Map();
@@ -82,7 +82,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   function buildBasemapPanel() {
     const container = document.getElementById("basemap-list");
     container.innerHTML = "";
-    let activeName = "Vệ tinh Google (Satellite)";
+    let activeName = "Bản đồ thường";
 
     Object.keys(baseLayers).forEach((name) => {
       const row = document.createElement("label");
@@ -472,31 +472,9 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
 
         const polygon = L.polygon(coords, {
           color: color,
-          weight: 4,          // viền dày hơn → dễ bấm trên mobile
+          weight: 2,
           fillColor: color,
-          fillOpacity: 0.15,  // fill mờ hơn → marker cây nổi rõ hơn
-          interactive: true,  // polygon vẫn interactive nhưng...
-          bubblingMouseEvents: false,
-        });
-
-        // Chỉ bắt click ở VIỀN polygon, không bắt ở vùng fill bên trong
-        // Kỹ thuật: CSS pointer-events: stroke (SVG chuẩn)
-        // → click vào fill xuyên qua polygon, xuống marker cây phía dưới
-        // → click vào viền (weight=4, dễ bấm) → mở popup vùng
-        polygon.on("add", function() {
-          const el = polygon.getElement();
-          if (el) {
-            el.style.pointerEvents = "stroke";
-            el.setAttribute("pointer-events", "stroke");
-          }
-        });
-
-        // Visual: hover vào viền thì sáng lên để người dùng biết đang bấm đúng
-        polygon.on("mouseover", function() {
-          polygon.setStyle({ weight: 5, opacity: 1 });
-        });
-        polygon.on("mouseout", function() {
-          polygon.setStyle({ weight: 4, opacity: 0.9 });
+          fillOpacity: 0.28,
         });
 
         const areaHtml = r.DienTich_ha
@@ -574,10 +552,6 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ? `<div class="popup-row"><b>Nguồn dữ liệu:</b> ${escapeHTML(r.NguonDuLieu)}</div>`
           : "";
         const descHtml = r.GhiChu ? `<div class="popup-desc">${escapeHTML(r.GhiChu)}</div>` : "";
-        const images = parseImageList(r.AnhURLs || "");
-        const galleryHtml = buildGalleryHTML(images, "CAY-" + (r.ID || layerName));
-        const videos = parseVideoList(r.VideoURLs || "");
-        const videoHtml = buildVideoGalleryHTML(videos, "CAY-" + (r.ID || layerName));
         const orthoHtmlTree = buildOrthoButtonHTML(r.VungID);
 
         const popupHtml = `
@@ -588,8 +562,6 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ${accHtml}
           ${nguonHtml}
           ${descHtml}
-          ${galleryHtml}
-          ${videoHtml}
           ${orthoHtmlTree}
         `;
 
@@ -909,6 +881,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
 
   function openBottomSheet(html) {
     bsRecalc();
+    if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
     bottomSheetContent.innerHTML = html;
     bottomSheetContent.scrollTop = 0;
     bottomSheetScrim.classList.add("open");
@@ -923,6 +896,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     bottomSheetScrim.classList.remove("open");
     bsIsOpen = false;
     document.getElementById("zoom-indicator").style.display = "";
+    if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
   }
 
   function bsDragStart(clientY) {
@@ -987,9 +961,67 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   window.addEventListener("resize", () => {
     if (bsIsOpen) bsRecalc();
   });
-  // Chạm ra ngoài (lên nền bản đồ) cũng đóng sheet, giống hành vi Google Maps
-  map.on("click", () => {
-    if (bsIsOpen) closeBottomSheet();
+  // ---------------------------------------------------------------
+  // Click vào bản đồ → hiện toạ độ + nút mở Google Maps
+  // Không áp dụng khi: đang vẽ/sửa/xoá lô đất (công cụ đo diện tích),
+  // hoặc khi click chỉ nhằm mục đích đóng bottom sheet đang mở.
+  // ---------------------------------------------------------------
+  let clickCoordMarker = null;
+  let isDrawToolActive = false;
+
+  // Theo dõi trạng thái vẽ/sửa/xoá của Leaflet.draw (không cần load trước app.js
+  // vì đây chỉ là tên sự kiện dạng chuỗi, không phụ thuộc namespace L.Draw)
+  map.on("draw:drawstart", () => { isDrawToolActive = true; });
+  map.on("draw:drawstop", () => { isDrawToolActive = false; });
+  map.on("draw:editstart", () => { isDrawToolActive = true; });
+  map.on("draw:editstop", () => { isDrawToolActive = false; });
+  map.on("draw:deletestart", () => { isDrawToolActive = true; });
+  map.on("draw:deletestop", () => { isDrawToolActive = false; });
+
+  function showCoordPopup(latlng) {
+    const lat = latlng.lat.toFixed(6);
+    const lng = latlng.lng.toFixed(6);
+    const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
+    const html = `
+      <div class="popup-eyebrow">Toạ độ đã chọn</div>
+      <div class="popup-title">📍 Vị trí trên bản đồ</div>
+      <div class="popup-row"><b>Vĩ độ (Lat):</b> ${lat}</div>
+      <div class="popup-row"><b>Kinh độ (Lng):</b> ${lng}</div>
+      <a href="${gmapsUrl}" target="_blank" rel="noopener noreferrer" class="ortho-btn" style="text-decoration:none;">
+        <span class="ortho-ico">🗺️</span>
+        <div>Mở trong Google Maps</div>
+      </a>
+    `;
+
+    if (isMobileViewport()) {
+      openBottomSheet(html); // tự dọn marker toạ độ cũ (nếu có) bên trong
+    } else {
+      if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
+      L.popup({ closeButton: true, maxWidth: 260 })
+        .setLatLng(latlng)
+        .setContent(html)
+        .openOn(map);
+    }
+
+    clickCoordMarker = L.circleMarker(latlng, {
+      radius: 7,
+      color: "#fff",
+      weight: 2,
+      fillColor: "#b5651d",
+      fillOpacity: 1,
+    }).addTo(map);
+  }
+
+  // Dọn marker toạ độ khi popup cổ điển (desktop) đóng lại
+  map.on("popupclose", () => {
+    if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
+  });
+
+  map.on("click", (e) => {
+    if (isDrawToolActive) return; // đang vẽ/sửa/xoá lô đất — bỏ qua
+    if (bsIsOpen) { closeBottomSheet(); return; } // chạm ra ngoài chỉ đóng sheet đang mở
+    showCoordPopup(e.latlng);
   });
 
   // Tự động ẩn/hiện lớp Cây trồng khi người dùng zoom vào/ra
