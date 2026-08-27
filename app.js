@@ -472,9 +472,31 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
 
         const polygon = L.polygon(coords, {
           color: color,
-          weight: 2,
+          weight: 4,          // viền dày hơn → dễ bấm trên mobile
           fillColor: color,
-          fillOpacity: 0.28,
+          fillOpacity: 0.15,  // fill mờ hơn → marker cây nổi rõ hơn
+          interactive: true,  // polygon vẫn interactive nhưng...
+          bubblingMouseEvents: false,
+        });
+
+        // Chỉ bắt click ở VIỀN polygon, không bắt ở vùng fill bên trong
+        // Kỹ thuật: CSS pointer-events: stroke (SVG chuẩn)
+        // → click vào fill xuyên qua polygon, xuống marker cây phía dưới
+        // → click vào viền (weight=4, dễ bấm) → mở popup vùng
+        polygon.on("add", function() {
+          const el = polygon.getElement();
+          if (el) {
+            el.style.pointerEvents = "stroke";
+            el.setAttribute("pointer-events", "stroke");
+          }
+        });
+
+        // Visual: hover vào viền thì sáng lên để người dùng biết đang bấm đúng
+        polygon.on("mouseover", function() {
+          polygon.setStyle({ weight: 5, opacity: 1 });
+        });
+        polygon.on("mouseout", function() {
+          polygon.setStyle({ weight: 4, opacity: 0.9 });
         });
 
         const areaHtml = r.DienTich_ha
