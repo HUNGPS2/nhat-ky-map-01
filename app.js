@@ -68,7 +68,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     }),
   };
 
-  baseLayers["Bản đồ thường"].addTo(map);
+  baseLayers["Vệ tinh Google (Satellite)"].addTo(map);
 
   // layerName -> { group: L.LayerGroup, color: string, kind: 'marker'|'polygon', count: number }
   const layerRegistry = new Map();
@@ -82,7 +82,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   function buildBasemapPanel() {
     const container = document.getElementById("basemap-list");
     container.innerHTML = "";
-    let activeName = "Bản đồ thường";
+    let activeName = "Vệ tinh Google (Satellite)";
 
     Object.keys(baseLayers).forEach((name) => {
       const row = document.createElement("label");
