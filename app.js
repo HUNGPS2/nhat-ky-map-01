@@ -397,8 +397,10 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     if (isNaN(gsd) || gsd <= 0) return null;
     const cmPerPixelAtZ0 = 156543.03392 * 100 * Math.cos((lat * Math.PI) / 180);
     const z = Math.log2(cmPerPixelAtZ0 / gsd);
-    // Giới hạn trong khoảng hợp lý, tránh dữ liệu nhập sai gây zoom quá đà hoặc quá thấp
-    return Math.min(24, Math.max(14, Math.round(z)));
+    // Làm tròn XUỐNG (không phải làm tròn gần nhất) — thà upsample sớm hơn 1 mức
+    // (gần như không nhận ra) còn hơn vượt quá tile thật có trên server (gây tile ảo/đen màn hình).
+    // Giới hạn trong khoảng hợp lý, tránh dữ liệu nhập sai gây zoom quá đà hoặc quá thấp.
+    return Math.min(24, Math.max(14, Math.floor(z)));
   }
 
   // ---------------------------------------------------------------
@@ -1148,9 +1150,11 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         attributionControl: true,
       });
       // Thêm nền OSM mờ làm context (đặc biệt hữu ích khi tile chưa load hết)
+      // maxNativeZoom: 19 — đúng giới hạn tile thật của OSM, tránh gọi tile ảo (z>19 không tồn tại)
+      // ở mức zoom sâu khiến tile trong suốt, lộ nền đen phía sau.
       orthoBaseLayer = L.tileLayer(
         "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        { opacity: 0.3, maxZoom: 24, attribution: "© OSM" }
+        { opacity: 0.3, maxZoom: 24, maxNativeZoom: 19, attribution: "© OSM" }
       ).addTo(orthoMap);
     }
 
@@ -1165,9 +1169,14 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
       // maxNativeZoom = mức zoom khớp đúng độ phân giải gốc ảnh drone (tính từ DoPhanGiai_cm).
       // Zoom sâu hơn mức này, Leaflet tự phóng to tile cuối cùng (upsample) thay vì gọi tile ảo không tồn tại.
       const nativeZoom = ortho.maxNativeZoom || 22; // 22 ≈ mặc định an toàn nếu sheet chưa điền DoPhanGiai_cm
+      // Cho phép pinch-zoom thêm tối đa 2 mức để phóng to mượt (upsample), nhưng không quá xa
+      // độ phân giải thật — hạn chế rủi ro rơi vào vùng hoàn toàn không có tile nào để hiển thị.
+      const viewerMaxZoom = Math.min(24, nativeZoom + 2);
+      orthoMap.setMaxZoom(viewerMaxZoom);
+
       orthoImageLayer = L.tileLayer(ortho.tileUrl, {
         minZoom: 10,
-        maxZoom: 24,
+        maxZoom: viewerMaxZoom,
         maxNativeZoom: nativeZoom,
         tms: false,       // WebODM export XYZ (không phải TMS ngược) — đổi thành true nếu ảnh bị lật
         opacity: 1,
@@ -1180,11 +1189,14 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         orthoMap.invalidateSize();
         const center = L.latLngBounds(leafletBounds).getCenter();
         orthoMap.setView(center, Math.min(18, nativeZoom));
-        orthoMap.setMaxBounds(L.latLngBounds(leafletBounds).pad(1.0));
+        // Giảm đệm bounds từ pad(1.0) xuống pad(0.25) — vẫn đủ rộng để pan xem xung quanh,
+        // nhưng không lạc quá xa ra ngoài phạm vi ảnh thật (nơi hoàn toàn không có tile nào).
+        orthoMap.setMaxBounds(L.latLngBounds(leafletBounds).pad(0.25));
       });
 
     } else {
       // --- Chế độ IMAGE: JPG tổng quan, dùng imageOverlay ---
+      orthoMap.setMaxZoom(24);
       orthoImageLayer = L.imageOverlay(ortho.imageUrl, leafletBounds, {
         interactive: false,
         opacity: 1,
