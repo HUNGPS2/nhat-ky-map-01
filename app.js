@@ -495,6 +495,16 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           weight: 2,
           fillColor: color,
           fillOpacity: 0.28,
+          interactive: false, // vùng nền không bắt click nữa — tránh che mất/giành click của marker Cây trồng bên trên
+        });
+
+        // Đường viền riêng, đè đúng lên đường biên polygon nhưng "dày" hơn (vô hình) để dễ bấm trúng —
+        // chỉ đường viền này mới bắt click/hover, vùng nền bên trong không còn phản hồi click.
+        const closedRing = coords.length > 0 ? [...coords, coords[0]] : coords;
+        const borderHit = L.polyline(closedRing, {
+          color: color,
+          weight: 16,   // vùng bấm rộng quanh viền, dễ nhắm trên di động
+          opacity: 0,   // vô hình — chỉ đường viền gốc (weight:2) của polygon mới hiển thị
         });
 
         const areaHtml = r.DienTich_ha
@@ -522,15 +532,19 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         `;
 
         if (isMobileViewport()) {
-          polygon.on("click", (e) => {
+          borderHit.on("click", (e) => {
             L.DomEvent.stopPropagation(e);
             openBottomSheet(popupHtml);
           });
         } else {
-          polygon.bindPopup(popupHtml);
+          // Hover viền sáng lên — gợi ý đây là vùng bấm được (chỉ áp dụng desktop, có chuột)
+          borderHit.on("mouseover", () => polygon.setStyle({ weight: 4, color: "#ffffff" }));
+          borderHit.on("mouseout", () => polygon.setStyle({ weight: 2, color: color }));
+          borderHit.bindPopup(popupHtml);
         }
 
         entry.group.addLayer(polygon);
+        entry.group.addLayer(borderHit);
       });
   }
 
@@ -613,34 +627,13 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     const checkbox = document.querySelector('.layer-row input[data-layer="Cây trồng"]');
     const userEnabled = checkbox ? checkbox.checked : true;
 
-    if (!userEnabled) {
-      applyVungInteractivityByZoom();
-      return; // người dùng đã tắt thủ công, không can thiệp thêm
-    }
+    if (!userEnabled) return; // người dùng đã tắt thủ công, không can thiệp
 
     if (map.getZoom() >= minZoom) {
       if (!map.hasLayer(entry.group)) entry.group.addTo(map);
     } else {
       if (map.hasLayer(entry.group)) map.removeLayer(entry.group);
     }
-    applyVungInteractivityByZoom();
-  }
-
-  // Khi lớp Cây trồng đang thực sự hiển thị trên bản đồ, tạm tắt khả năng bấm (click)
-  // của các polygon Vùng nguyên liệu bên dưới — tránh bấm trượt khỏi chấm cây nhỏ
-  // lại rơi vào vùng đa giác lớn hơn, mở nhầm thông tin Vùng thay vì thông tin Cây.
-  // Nếu Vùng nào không có cây nào bên trong (lớp Cây trồng đang tắt/ẩn), Vùng vẫn
-  // bấm được bình thường như trước.
-  function applyVungInteractivityByZoom() {
-    const cayEntry = layerRegistry.get("Cây trồng");
-    const cayDangHien = !!(cayEntry && map.hasLayer(cayEntry.group) && cayEntry.count > 0);
-
-    layerRegistry.forEach((entry) => {
-      if (entry.kind !== "polygon") return;
-      entry.group.eachLayer((layer) => {
-        layer.options.interactive = !cayDangHien;
-      });
-    });
   }
 
   // ---------------------------------------------------------------
@@ -668,7 +661,6 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           }
         } else {
           map.removeLayer(entry.group);
-          if (name === "Cây trồng") applyVungInteractivityByZoom();
         }
       });
 
