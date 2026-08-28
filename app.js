@@ -388,6 +388,20 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   }
 
   // ---------------------------------------------------------------
+  // Tính mức zoom tile cao nhất còn "thật" (khớp độ phân giải gốc ảnh drone),
+  // dựa trên công thức độ phân giải tile Web Mercator: res(z,lat) = 156543.03392*cos(lat)/2^z (m/pixel)
+  // Zoom cao hơn mức này chỉ là phóng to ảnh đã có (upsample), không hiện thêm chi tiết thật.
+  // ---------------------------------------------------------------
+  function calcNativeZoomFromGSD(gsdCm, lat) {
+    const gsd = parseFloat(gsdCm);
+    if (isNaN(gsd) || gsd <= 0) return null;
+    const cmPerPixelAtZ0 = 156543.03392 * 100 * Math.cos((lat * Math.PI) / 180);
+    const z = Math.log2(cmPerPixelAtZ0 / gsd);
+    // Giới hạn trong khoảng hợp lý, tránh dữ liệu nhập sai gây zoom quá đà hoặc quá thấp
+    return Math.min(24, Math.max(14, Math.round(z)));
+  }
+
+  // ---------------------------------------------------------------
   // Orthomosaic registry — nạp từ sheet Orthomosaic, tra cứu theo VungID
   // ---------------------------------------------------------------
   function loadOrthomosaicRegistry(rows) {
@@ -416,6 +430,9 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ? toDirectImageURL(thumbUrl)
           : (imageUrl ? toDirectImageURL(imageUrl) : null);
 
+        const centerLat = (north + south) / 2;
+        const maxNativeZoom = calcNativeZoomFromGSD(r.DoPhanGiai_cm, centerLat);
+
         orthoRegistry.set(r.VungID, {
           id:          r.ID,
           vungId:      r.VungID,
@@ -426,6 +443,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           thumbUrl:    thumbResolved,
           bounds:      { north, south, east, west },
           doPhanGiai:  r.DoPhanGiai_cm || "",
+          maxNativeZoom, // null nếu sheet chưa điền DoPhanGiai_cm — sẽ dùng mặc định khi hiển thị
         });
       });
   }
@@ -1086,7 +1104,9 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     // Cập nhật tiêu đề viewer
     orthoViewerTitle.textContent = ortho.tenLop + (vungId ? ` — ${vungId}` : "");
     const modeLabel = ortho.displayMode === "tile"
-      ? (ortho.doPhanGiai ? `Tile HD ~${ortho.doPhanGiai}cm/pixel · Zoom sâu để xem từng cây` : "Tile HD · Zoom sâu để xem từng cây")
+      ? (ortho.doPhanGiai
+          ? `Tile HD ~${ortho.doPhanGiai}cm/pixel · Nét nhất ở zoom ${ortho.maxNativeZoom || 22}`
+          : "Tile HD · Zoom sâu để xem từng cây")
       : (ortho.doPhanGiai ? `Ảnh tổng quan ~${ortho.doPhanGiai}cm/pixel` : "Ảnh tổng quan");
     orthoViewerSub.textContent = modeLabel;
 
@@ -1120,20 +1140,24 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
 
     if (ortho.displayMode === "tile") {
       // --- Chế độ TILE HD: zoom sâu, chi tiết từng cây ---
+      // maxNativeZoom = mức zoom khớp đúng độ phân giải gốc ảnh drone (tính từ DoPhanGiai_cm).
+      // Zoom sâu hơn mức này, Leaflet tự phóng to tile cuối cùng (upsample) thay vì gọi tile ảo không tồn tại.
+      const nativeZoom = ortho.maxNativeZoom || 22; // 22 ≈ mặc định an toàn nếu sheet chưa điền DoPhanGiai_cm
       orthoImageLayer = L.tileLayer(ortho.tileUrl, {
         minZoom: 10,
         maxZoom: 24,
+        maxNativeZoom: nativeZoom,
         tms: false,       // WebODM export XYZ (không phải TMS ngược) — đổi thành true nếu ảnh bị lật
         opacity: 1,
         attribution: "Orthomosaic © CPART",
         errorTileUrl: "", // tile lỗi hiện trong suốt thay vì icon vỡ
       }).addTo(orthoMap);
 
-      // Zoom về mức 18 để thấy chi tiết ngay khi mở
+      // Zoom về mức phù hợp để thấy chi tiết ngay khi mở, nhưng không vượt quá độ phân giải gốc
       requestAnimationFrame(() => {
         orthoMap.invalidateSize();
         const center = L.latLngBounds(leafletBounds).getCenter();
-        orthoMap.setView(center, 18);
+        orthoMap.setView(center, Math.min(18, nativeZoom));
         orthoMap.setMaxBounds(L.latLngBounds(leafletBounds).pad(1.0));
       });
 
