@@ -73,6 +73,12 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   // layerName -> { group: L.LayerGroup, color: string, kind: 'marker'|'polygon', count: number }
   const layerRegistry = new Map();
 
+  // Style mặc định và style "đang được chọn" của chấm Cây trồng — dùng chung cho
+  // hiệu ứng hover (desktop) và trạng thái giữ nổi bật sau khi chạm chọn (mobile)
+  const TREE_DEFAULT_STYLE = { radius: 6, weight: 1.8, color: "#ffffff" };
+  const TREE_HIGHLIGHT_STYLE = { radius: 8, weight: 3, color: "#00e5ff" };
+  let highlightedTreeMarker = null; // marker cây đang được tô sáng (mobile: giữ tới khi đóng panel)
+
   // VungID -> { id, tenLop, imageUrl, thumbUrl, bounds: {north,south,east,west}, doPhanGiai }
   const orthoRegistry = new Map();
 
@@ -566,15 +572,17 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         entry.count++;
 
         const marker = L.circleMarker([lat, lng], {
-          radius: 6,
+          ...TREE_DEFAULT_STYLE,
           fillColor: color,
-          color: "#ffffff",
-          weight: 1.8,
           fillOpacity: 0.95,
         });
 
         const accHtml = r.DoChinhXac_m
           ? `<div class="popup-row"><b>Độ chính xác GPS:</b> ±${escapeHTML(r.DoChinhXac_m)}m</div>`
+          : "";
+        const maCay = r.ID ? String(r.ID) : "";
+        const maCayHtml = maCay
+          ? `<div class="popup-row"><b>Mã cây:</b> ${escapeHTML(maCay)}</div>`
           : "";
         const vungHtml = r.VungID
           ? `<div class="popup-row"><b>Thuộc vùng:</b> ${escapeHTML(r.VungID)}</div>`
@@ -595,6 +603,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         const popupHtml = `
           <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
           <div class="popup-title">${escapeHTML(r.LoaiCay || "(Chưa rõ loại)")}</div>
+          ${maCayHtml}
           ${vungHtml}
           ${ngayHtml}
           ${accHtml}
@@ -608,7 +617,9 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         if (isMobileViewport()) {
           marker.on("click", (e) => {
             L.DomEvent.stopPropagation(e);
-            openBottomSheet(popupHtml);
+            openBottomSheet(popupHtml); // sẽ tự dọn highlight cây trước đó (nếu có) bên trong
+            highlightedTreeMarker = marker;
+            marker.setStyle(TREE_HIGHLIGHT_STYLE);
           });
         } else {
           marker.bindPopup(popupHtml);
@@ -616,7 +627,6 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           // Hover sáng viền + hiện mã cây — giúp phân biệt rõ khi nhiều cây nằm sát nhau.
           // Màu cyan được chọn vì gần như không xuất hiện tự nhiên trong ảnh vệ tinh/nông
           // nghiệp (xanh lá, nâu, cam), nên luôn nổi bật rõ bất kể nền/lớp bản đồ nào.
-          const maCay = r.ID ? String(r.ID) : "";
           marker.bindTooltip(maCay ? `Mã cây: ${escapeHTML(maCay)}` : (r.LoaiCay || "Cây trồng"), {
             direction: "top",
             offset: [0, -8],
@@ -624,11 +634,11 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
             className: "tree-hover-tooltip",
           });
           marker.on("mouseover", () => {
-            marker.setStyle({ radius: 8, weight: 3, color: "#00e5ff" });
+            marker.setStyle(TREE_HIGHLIGHT_STYLE);
             marker.openTooltip();
           });
           marker.on("mouseout", () => {
-            marker.setStyle({ radius: 6, weight: 1.8, color: "#ffffff" });
+            marker.setStyle(TREE_DEFAULT_STYLE);
             marker.closeTooltip();
           });
         }
@@ -941,6 +951,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   function openBottomSheet(html) {
     bsRecalc();
     if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
+    if (highlightedTreeMarker) { highlightedTreeMarker.setStyle(TREE_DEFAULT_STYLE); highlightedTreeMarker = null; }
     bottomSheetContent.innerHTML = html;
     bottomSheetContent.scrollTop = 0;
     bottomSheetScrim.classList.add("open");
@@ -956,6 +967,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     bsIsOpen = false;
     document.getElementById("zoom-indicator").style.display = "";
     if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
+    if (highlightedTreeMarker) { highlightedTreeMarker.setStyle(TREE_DEFAULT_STYLE); highlightedTreeMarker = null; }
   }
 
   function bsDragStart(clientY) {
