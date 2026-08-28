@@ -612,6 +612,25 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           });
         } else {
           marker.bindPopup(popupHtml);
+
+          // Hover sáng viền + hiện mã cây — giúp phân biệt rõ khi nhiều cây nằm sát nhau.
+          // Màu cyan được chọn vì gần như không xuất hiện tự nhiên trong ảnh vệ tinh/nông
+          // nghiệp (xanh lá, nâu, cam), nên luôn nổi bật rõ bất kể nền/lớp bản đồ nào.
+          const maCay = r.ID ? String(r.ID) : "";
+          marker.bindTooltip(maCay ? `Mã cây: ${escapeHTML(maCay)}` : (r.LoaiCay || "Cây trồng"), {
+            direction: "top",
+            offset: [0, -8],
+            opacity: 0.95,
+            className: "tree-hover-tooltip",
+          });
+          marker.on("mouseover", () => {
+            marker.setStyle({ radius: 8, weight: 3, color: "#00e5ff" });
+            marker.openTooltip();
+          });
+          marker.on("mouseout", () => {
+            marker.setStyle({ radius: 6, weight: 1.8, color: "#ffffff" });
+            marker.closeTooltip();
+          });
         }
 
         entry.group.addLayer(marker);
