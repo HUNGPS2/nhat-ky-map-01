@@ -1058,9 +1058,15 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
   });
 
+  // Cho module coord-click-toggle-module.js gọi để dọn marker khi người dùng tắt tính năng
+  window.__clearCoordClickMarker = function () {
+    if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
+  };
+
   map.on("click", (e) => {
     if (isDrawToolActive) return; // đang vẽ/sửa/xoá lô đất — bỏ qua
     if (bsIsOpen) { closeBottomSheet(); return; } // chạm ra ngoài chỉ đóng sheet đang mở
+    if (!map.coordClickEnabled) return; // tính năng đang tắt — bấm bản đồ không làm gì cả
     showCoordPopup(e.latlng);
   });
 
