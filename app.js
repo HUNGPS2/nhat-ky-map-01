@@ -550,10 +550,10 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         entry.count++;
 
         const marker = L.circleMarker([lat, lng], {
-          radius: 4,
+          radius: 6,
           fillColor: color,
           color: "#ffffff",
-          weight: 1.2,
+          weight: 1.8,
           fillOpacity: 0.95,
         });
 
@@ -605,13 +605,34 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     const checkbox = document.querySelector('.layer-row input[data-layer="Cây trồng"]');
     const userEnabled = checkbox ? checkbox.checked : true;
 
-    if (!userEnabled) return; // người dùng đã tắt thủ công, không can thiệp
+    if (!userEnabled) {
+      applyVungInteractivityByZoom();
+      return; // người dùng đã tắt thủ công, không can thiệp thêm
+    }
 
     if (map.getZoom() >= minZoom) {
       if (!map.hasLayer(entry.group)) entry.group.addTo(map);
     } else {
       if (map.hasLayer(entry.group)) map.removeLayer(entry.group);
     }
+    applyVungInteractivityByZoom();
+  }
+
+  // Khi lớp Cây trồng đang thực sự hiển thị trên bản đồ, tạm tắt khả năng bấm (click)
+  // của các polygon Vùng nguyên liệu bên dưới — tránh bấm trượt khỏi chấm cây nhỏ
+  // lại rơi vào vùng đa giác lớn hơn, mở nhầm thông tin Vùng thay vì thông tin Cây.
+  // Nếu Vùng nào không có cây nào bên trong (lớp Cây trồng đang tắt/ẩn), Vùng vẫn
+  // bấm được bình thường như trước.
+  function applyVungInteractivityByZoom() {
+    const cayEntry = layerRegistry.get("Cây trồng");
+    const cayDangHien = !!(cayEntry && map.hasLayer(cayEntry.group) && cayEntry.count > 0);
+
+    layerRegistry.forEach((entry) => {
+      if (entry.kind !== "polygon") return;
+      entry.group.eachLayer((layer) => {
+        layer.options.interactive = !cayDangHien;
+      });
+    });
   }
 
   // ---------------------------------------------------------------
@@ -639,6 +660,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           }
         } else {
           map.removeLayer(entry.group);
+          if (name === "Cây trồng") applyVungInteractivityByZoom();
         }
       });
 
