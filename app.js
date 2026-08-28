@@ -36,7 +36,7 @@
   const map = L.map("map", {
     zoomControl: true,
     minZoom: 5,
-    maxZoom: 19,
+    maxZoom: 20, // khớp với maxZoom của 2 lớp Google (Địa hình/Vệ tinh) — OSM/OpenTopoMap tự dừng ở mức thật của họ (19/17)
   }).setView(initialView.center, initialView.zoom);
 window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập được biến map
 
@@ -572,6 +572,10 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ? `<div class="popup-row"><b>Nguồn dữ liệu:</b> ${escapeHTML(r.NguonDuLieu)}</div>`
           : "";
         const descHtml = r.GhiChu ? `<div class="popup-desc">${escapeHTML(r.GhiChu)}</div>` : "";
+        const images = parseImageList(r.AnhURLs);
+        const galleryHtml = buildGalleryHTML(images, "CT-" + (r.ID || layerName));
+        const videos = parseVideoList(r.VideoURLs || "");
+        const videoHtml = buildVideoGalleryHTML(videos, "CT-" + (r.ID || layerName));
         const orthoHtmlTree = buildOrthoButtonHTML(r.VungID);
 
         const popupHtml = `
@@ -582,6 +586,8 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ${accHtml}
           ${nguonHtml}
           ${descHtml}
+          ${galleryHtml}
+          ${videoHtml}
           ${orthoHtmlTree}
         `;
 
