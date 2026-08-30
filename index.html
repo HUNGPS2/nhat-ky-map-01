@@ -306,11 +306,22 @@
     display:flex;align-items:center;gap:12px;
     flex-shrink:0;
   }
+  #ortho-viewer-header > div:first-child{
+    flex:1;min-width:0;
+  }
   #ortho-viewer-header .ov-title{
-    font-size:14.5px;font-weight:700;flex:1;
+    font-size:14.5px;font-weight:700;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
   #ortho-viewer-header .ov-sub{
     font-size:11.5px;color:#a8b39c;font-weight:400;margin-top:2px;
+  }
+  #ortho-opacity-control{
+    display:flex;align-items:center;gap:6px;flex-shrink:0;
+  }
+  #ortho-opacity-control .ov-opacity-icon{font-size:13px;opacity:0.85;}
+  #ortho-opacity-control input[type="range"]{
+    width:88px;height:4px;accent-color:#7a9a3d;cursor:pointer;
   }
   #ortho-viewer-close{
     background:rgba(255,255,255,0.1);border:none;color:#fff;
@@ -344,6 +355,9 @@
     #auth-pill{font-size:10.5px;padding:6px 10px;}
     #auth-pill #auth-label{display:none;}
     #auth-popover{width:calc(100vw - 36px);right:14px;}
+    #ortho-viewer-header{padding:10px 12px;gap:8px;}
+    #ortho-viewer-header .ov-sub{display:none;}
+    #ortho-opacity-control input[type="range"]{width:56px;}
   }
 
   .leaflet-control-zoom{margin-top:0 !important;}
@@ -552,6 +566,11 @@
       <div>
         <div class="ov-title" id="ortho-viewer-title">Orthomosaic</div>
         <div class="ov-sub" id="ortho-viewer-sub"></div>
+      </div>
+      <div id="ortho-opacity-control" title="Độ trong suốt ảnh Orthomosaic — kéo để so sánh với bản đồ nền">
+        <span class="ov-opacity-icon">🔅</span>
+        <input type="range" id="ortho-opacity-slider" min="0" max="100" value="100" />
+        <span class="ov-opacity-icon">🔆</span>
       </div>
       <button id="ortho-viewer-close" aria-label="Đóng">&times;</button>
     </div>

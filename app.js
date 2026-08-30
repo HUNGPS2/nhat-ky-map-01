@@ -78,6 +78,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   const TREE_DEFAULT_STYLE = { radius: 6, weight: 1.8, color: "#ffffff" };
   const TREE_HIGHLIGHT_STYLE = { radius: 8, weight: 3, color: "#00e5ff" };
   let highlightedTreeMarker = null; // marker cây đang được tô sáng (mobile: giữ tới khi đóng panel)
+  let cayTrongRowsCache = []; // lưu dữ liệu Cây trồng gốc — dùng lại để hiện lên viewer Orthomosaic
 
   // VungID -> { id, tenLop, imageUrl, thumbUrl, bounds: {north,south,east,west}, doPhanGiai }
   const orthoRegistry = new Map();
@@ -557,7 +558,49 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   // ---------------------------------------------------------------
   // Render: CayTrong (định vị từng cây — marker nhỏ, dày đặc)
   // ---------------------------------------------------------------
+  // Dựng nội dung popup cho 1 dòng Cây trồng — dùng chung cho marker trên bản đồ chính
+  // VÀ marker hiện lại trong viewer Orthomosaic (đối chiếu vị trí GPS với ảnh thực tế).
+  function buildCayTrongPopupHtml(r, layerName) {
+    const accHtml = r.DoChinhXac_m
+      ? `<div class="popup-row"><b>Độ chính xác GPS:</b> ±${escapeHTML(r.DoChinhXac_m)}m</div>`
+      : "";
+    const maCay = r.ID ? String(r.ID) : "";
+    const maCayHtml = maCay
+      ? `<div class="popup-row"><b>Mã cây:</b> ${escapeHTML(maCay)}</div>`
+      : "";
+    const vungHtml = r.VungID
+      ? `<div class="popup-row"><b>Thuộc vùng:</b> ${escapeHTML(r.VungID)}</div>`
+      : "";
+    const ngayHtml = r.NgayTrong
+      ? `<div class="popup-row"><b>Ngày trồng:</b> ${escapeHTML(r.NgayTrong)}</div>`
+      : "";
+    const nguonHtml = r.NguonDuLieu
+      ? `<div class="popup-row"><b>Nguồn dữ liệu:</b> ${escapeHTML(r.NguonDuLieu)}</div>`
+      : "";
+    const descHtml = r.GhiChu ? `<div class="popup-desc">${escapeHTML(r.GhiChu)}</div>` : "";
+    const images = parseImageList(r.AnhURLs);
+    const galleryHtml = buildGalleryHTML(images, "CT-" + (r.ID || layerName));
+    const videos = parseVideoList(r.VideoURLs || "");
+    const videoHtml = buildVideoGalleryHTML(videos, "CT-" + (r.ID || layerName));
+    const orthoHtmlTree = buildOrthoButtonHTML(r.VungID);
+
+    return `
+      <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
+      <div class="popup-title">${escapeHTML(r.LoaiCay || "(Chưa rõ loại)")}</div>
+      ${maCayHtml}
+      ${vungHtml}
+      ${ngayHtml}
+      ${accHtml}
+      ${nguonHtml}
+      ${descHtml}
+      ${galleryHtml}
+      ${videoHtml}
+      ${orthoHtmlTree}
+    `;
+  }
+
   function renderCayTrong(rows) {
+    cayTrongRowsCache = rows; // lưu lại để viewer Orthomosaic dùng, hiện đúng cây thuộc từng vùng
     rows
       .filter((r) => (r.TrangThai || "").toLowerCase() !== "ẩn" && (r.TrangThai || "").toLowerCase() !== "an")
       .forEach((r) => {
@@ -577,42 +620,8 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           fillOpacity: 0.95,
         });
 
-        const accHtml = r.DoChinhXac_m
-          ? `<div class="popup-row"><b>Độ chính xác GPS:</b> ±${escapeHTML(r.DoChinhXac_m)}m</div>`
-          : "";
         const maCay = r.ID ? String(r.ID) : "";
-        const maCayHtml = maCay
-          ? `<div class="popup-row"><b>Mã cây:</b> ${escapeHTML(maCay)}</div>`
-          : "";
-        const vungHtml = r.VungID
-          ? `<div class="popup-row"><b>Thuộc vùng:</b> ${escapeHTML(r.VungID)}</div>`
-          : "";
-        const ngayHtml = r.NgayTrong
-          ? `<div class="popup-row"><b>Ngày trồng:</b> ${escapeHTML(r.NgayTrong)}</div>`
-          : "";
-        const nguonHtml = r.NguonDuLieu
-          ? `<div class="popup-row"><b>Nguồn dữ liệu:</b> ${escapeHTML(r.NguonDuLieu)}</div>`
-          : "";
-        const descHtml = r.GhiChu ? `<div class="popup-desc">${escapeHTML(r.GhiChu)}</div>` : "";
-        const images = parseImageList(r.AnhURLs);
-        const galleryHtml = buildGalleryHTML(images, "CT-" + (r.ID || layerName));
-        const videos = parseVideoList(r.VideoURLs || "");
-        const videoHtml = buildVideoGalleryHTML(videos, "CT-" + (r.ID || layerName));
-        const orthoHtmlTree = buildOrthoButtonHTML(r.VungID);
-
-        const popupHtml = `
-          <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
-          <div class="popup-title">${escapeHTML(r.LoaiCay || "(Chưa rõ loại)")}</div>
-          ${maCayHtml}
-          ${vungHtml}
-          ${ngayHtml}
-          ${accHtml}
-          ${nguonHtml}
-          ${descHtml}
-          ${galleryHtml}
-          ${videoHtml}
-          ${orthoHtmlTree}
-        `;
+        const popupHtml = buildCayTrongPopupHtml(r, layerName);
 
         if (isMobileViewport()) {
           marker.on("click", (e) => {
@@ -1152,6 +1161,51 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   let orthoMap = null;
   let orthoImageLayer = null;
   let orthoBaseLayer = null; // nền OSM bên dưới tile orthomosaic
+  let orthoTreeLayer = null; // lớp Cây trồng hiện lại trên ảnh Orthomosaic để đối chiếu vị trí thật
+  const orthoOpacitySlider = document.getElementById("ortho-opacity-slider");
+
+  // Hiện lại các chấm Cây trồng thuộc đúng vùng đang xem, đúng vị trí GPS thật —
+  // để đối chiếu trực quan giữa toạ độ đã ghi nhận và ảnh chụp drone độ nét cao.
+  // Luôn nằm trên cùng (Leaflet tự xếp vector layer trên tile layer, không cần chỉnh z-index).
+  function renderOrthoTreeOverlay(vungId) {
+    orthoTreeLayer.clearLayers();
+    const treeColors = MAP_CONFIG.TREE_TYPE_COLORS || {};
+
+    cayTrongRowsCache
+      .filter((r) => r.VungID === vungId)
+      .filter((r) => (r.TrangThai || "").toLowerCase() !== "ẩn" && (r.TrangThai || "").toLowerCase() !== "an")
+      .forEach((r) => {
+        const lat = parseFloat(r.Lat);
+        const lng = parseFloat(r.Lng);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        const color = treeColors[r.LoaiCay] || "#7a9a3d";
+        const treeMarker = L.circleMarker([lat, lng], {
+          ...TREE_DEFAULT_STYLE,
+          fillColor: color,
+          fillOpacity: 0.95,
+        });
+
+        const maCay = r.ID ? String(r.ID) : "";
+        treeMarker.bindPopup(buildCayTrongPopupHtml(r, r.LopBanDo || "Cây trồng"), { maxWidth: 260 });
+        treeMarker.bindTooltip(maCay ? `Mã cây: ${escapeHTML(maCay)}` : (r.LoaiCay || "Cây trồng"), {
+          direction: "top",
+          offset: [0, -8],
+          opacity: 0.95,
+          className: "tree-hover-tooltip",
+        });
+        treeMarker.on("mouseover", () => {
+          treeMarker.setStyle(TREE_HIGHLIGHT_STYLE);
+          treeMarker.openTooltip();
+        });
+        treeMarker.on("mouseout", () => {
+          treeMarker.setStyle(TREE_DEFAULT_STYLE);
+          treeMarker.closeTooltip();
+        });
+
+        orthoTreeLayer.addLayer(treeMarker);
+      });
+  }
 
   function openOrthoViewer(vungId) {
     const ortho = orthoRegistry.get(vungId);
@@ -1191,7 +1245,15 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
         { opacity: 0.3, maxZoom: 24, maxNativeZoom: 19, attribution: "© OSM" }
       ).addTo(orthoMap);
+      // Lớp Cây trồng — vector layer nên Leaflet tự xếp trên tilePane, luôn nổi trên ảnh
+      orthoTreeLayer = L.layerGroup().addTo(orthoMap);
     }
+
+    // Reset thanh trượt độ trong suốt về 100% mỗi lần mở lại
+    if (orthoOpacitySlider) orthoOpacitySlider.value = 100;
+
+    // Hiện lại đúng các cây thuộc vùng này lên trên ảnh
+    renderOrthoTreeOverlay(vungId);
 
     // Xóa layer cũ trước khi thêm mới
     if (orthoImageLayer) {
@@ -1260,6 +1322,12 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   }
 
   orthoViewerClose.addEventListener("click", closeOrthoViewer);
+
+  if (orthoOpacitySlider) {
+    orthoOpacitySlider.addEventListener("input", () => {
+      if (orthoImageLayer) orthoImageLayer.setOpacity(orthoOpacitySlider.value / 100);
+    });
+  }
   orthoViewerEl.addEventListener("click", (e) => {
     if (e.target === orthoViewerEl) closeOrthoViewer();
   });
