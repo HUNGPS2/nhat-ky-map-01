@@ -76,7 +76,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     ),
   };
 
-  baseLayers["Vệ tinh ESRI (chuẩn GPS)"].addTo(map);
+  baseLayers["Vệ tinh Google (Satellite)"].addTo(map);
 
   // layerName -> { group: L.LayerGroup, color: string, kind: 'marker'|'polygon', count: number }
   const layerRegistry = new Map();
@@ -97,7 +97,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   function buildBasemapPanel() {
     const container = document.getElementById("basemap-list");
     container.innerHTML = "";
-    let activeName = "Vệ tinh ESRI (chuẩn GPS)";
+    let activeName = "Vệ tinh Google (Satellite)";
 
     Object.keys(baseLayers).forEach((name) => {
       const row = document.createElement("label");
