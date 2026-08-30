@@ -66,9 +66,17 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
       attribution: "Map data &copy; Google",
       maxZoom: 20,
     }),
+    "Vệ tinh ESRI (chuẩn GPS)": L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        attribution: "Tiles &copy; Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, " +
+          "Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+        maxZoom: 19,
+      }
+    ),
   };
 
-  baseLayers["Vệ tinh Google (Satellite)"].addTo(map);
+  baseLayers["Vệ tinh ESRI (chuẩn GPS)"].addTo(map);
 
   // layerName -> { group: L.LayerGroup, color: string, kind: 'marker'|'polygon', count: number }
   const layerRegistry = new Map();
@@ -89,7 +97,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   function buildBasemapPanel() {
     const container = document.getElementById("basemap-list");
     container.innerHTML = "";
-    let activeName = "Vệ tinh Google (Satellite)";
+    let activeName = "Vệ tinh ESRI (chuẩn GPS)";
 
     Object.keys(baseLayers).forEach((name) => {
       const row = document.createElement("label");
