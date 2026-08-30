@@ -1157,12 +1157,26 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   const orthoViewerClose = document.getElementById("ortho-viewer-close");
   const orthoViewerTitle = document.getElementById("ortho-viewer-title");
   const orthoViewerSub = document.getElementById("ortho-viewer-sub");
+  const orthoZoomIndicator = document.getElementById("ortho-zoom-indicator");
 
   let orthoMap = null;
   let orthoImageLayer = null;
   let orthoBaseLayer = null; // nền OSM bên dưới tile orthomosaic
   let orthoTreeLayer = null; // lớp Cây trồng hiện lại trên ảnh Orthomosaic để đối chiếu vị trí thật
+  let currentOrthoNativeZoom = null; // mức zoom nét thật (giống ảnh gốc) của vùng đang xem — null nếu là ảnh tổng quan
   const orthoOpacitySlider = document.getElementById("ortho-opacity-slider");
+
+  // Cập nhật badge hiện mức zoom thực tế + ghi chú đã vượt độ nét gốc hay chưa
+  function updateOrthoZoomIndicator() {
+    if (!orthoMap || !orthoZoomIndicator) return;
+    const z = orthoMap.getZoom();
+    let note = "";
+    if (currentOrthoNativeZoom != null) {
+      if (z > currentOrthoNativeZoom) note = "đang phóng to";
+      else if (z === currentOrthoNativeZoom) note = "nét gốc";
+    }
+    orthoZoomIndicator.innerHTML = `Z${z}` + (note ? `<span class="oz-note">· ${note}</span>` : "");
+  }
 
   // Hiện lại các chấm Cây trồng thuộc đúng vùng đang xem, đúng vị trí GPS thật —
   // để đối chiếu trực quan giữa toạ độ đã ghi nhận và ảnh chụp drone độ nét cao.
@@ -1247,6 +1261,8 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
       ).addTo(orthoMap);
       // Lớp Cây trồng — vector layer nên Leaflet tự xếp trên tilePane, luôn nổi trên ảnh
       orthoTreeLayer = L.layerGroup().addTo(orthoMap);
+      // Badge hiện mức zoom thực tế, cập nhật mỗi khi zoom thay đổi
+      orthoMap.on("zoomend", updateOrthoZoomIndicator);
     }
 
     // Reset thanh trượt độ trong suốt về 100% mỗi lần mở lại
@@ -1281,6 +1297,8 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         errorTileUrl: "", // tile lỗi hiện trong suốt thay vì icon vỡ
       }).addTo(orthoMap);
 
+      currentOrthoNativeZoom = nativeZoom; // để badge biết khi nào đang vượt quá độ nét gốc
+
       // Zoom về mức phù hợp để thấy chi tiết ngay khi mở, nhưng không vượt quá độ phân giải gốc
       requestAnimationFrame(() => {
         orthoMap.invalidateSize();
@@ -1289,6 +1307,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         // Giảm đệm bounds từ pad(1.0) xuống pad(0.25) — vẫn đủ rộng để pan xem xung quanh,
         // nhưng không lạc quá xa ra ngoài phạm vi ảnh thật (nơi hoàn toàn không có tile nào).
         orthoMap.setMaxBounds(L.latLngBounds(leafletBounds).pad(0.25));
+        updateOrthoZoomIndicator();
       });
 
     } else {
@@ -1299,10 +1318,13 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         opacity: 1,
       }).addTo(orthoMap);
 
+      currentOrthoNativeZoom = null; // ảnh tổng quan không có khái niệm "zoom nét gốc" theo tile
+
       requestAnimationFrame(() => {
         orthoMap.invalidateSize();
         orthoMap.fitBounds(leafletBounds, { padding: [20, 20] });
         orthoMap.setMaxBounds(L.latLngBounds(leafletBounds).pad(0.6));
+        updateOrthoZoomIndicator();
       });
     }
   }

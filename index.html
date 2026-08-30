@@ -336,6 +336,15 @@
     padding:7px 16px;border-radius:999px;font-size:11.5px;
     pointer-events:none;
   }
+  #ortho-zoom-indicator{
+    position:absolute;bottom:18px;left:18px;
+    background:rgba(0,0,0,0.55);color:#dfe3d6;
+    padding:7px 14px;border-radius:999px;font-size:11.5px;font-weight:700;
+    pointer-events:none;
+  }
+  #ortho-zoom-indicator .oz-note{
+    font-weight:400;color:#a8b39c;margin-left:4px;
+  }
 
   /* ---------- Empty / error state ---------- */
   #empty-state{
@@ -575,6 +584,7 @@
       <button id="ortho-viewer-close" aria-label="Đóng">&times;</button>
     </div>
     <div id="ortho-map"></div>
+    <div id="ortho-zoom-indicator">Z—</div>
     <div id="ortho-viewer-hint">Kéo để di chuyển · Cuộn/chụm để zoom</div>
   </div>
 
