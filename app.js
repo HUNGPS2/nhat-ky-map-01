@@ -23,7 +23,12 @@
     const lat = parseFloat(params.get("lat"));
     const lng = parseFloat(params.get("lng"));
     const zoom = parseInt(params.get("zoom"), 10);
-    const maCayParam = params.get("maCay"); // đến từ QR code gắn trên cây ngoài thực địa
+    // Đọc tham số maCay KHÔNG phân biệt hoa/thường (macay, MaCay, MACAY...
+    // đều nhận diện được) — đến từ QR code gắn trên cây ngoài thực địa
+    let maCayParam = null;
+    for (const [key, value] of params.entries()) {
+      if (key.toLowerCase() === "macay" && value) { maCayParam = value; break; }
+    }
     const validLatLng = !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
     const validZoom = !isNaN(zoom) && zoom >= 1 && zoom <= 22;
     return {
