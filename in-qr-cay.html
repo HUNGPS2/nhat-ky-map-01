@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="initial-scale=1,width=device-width">
+<title>In QR code cho Cây trồng — CPART</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2b1f;
+    --paper:#f6f4ee;
+    --moss:#3d5c3a;
+    --moss-dark:#2a4027;
+    --clay:#b5651d;
+    --line:#d8d2c2;
+    --panel:#ffffff;
+    --cols:4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;font-family:'Inter','Segoe UI',Arial,sans-serif;
+    background:var(--paper);color:var(--ink);
+  }
+
+  /* ---------- Thanh điều khiển (ẩn khi in) ---------- */
+  #toolbar{
+    position:sticky;top:0;z-index:10;
+    background:var(--panel);
+    border-bottom:1px solid var(--line);
+    padding:14px 20px;
+    display:flex;flex-wrap:wrap;align-items:end;gap:14px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.06);
+  }
+  #toolbar h1{
+    font-size:15px;margin:0 20px 0 0;flex:0 0 auto;
+    color:var(--moss-dark);
+  }
+  #toolbar h1 span{display:block;font-size:11px;font-weight:400;color:#6b7268;margin-top:2px;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:#5d655a;}
+  .field input, .field select{
+    padding:7px 9px;border:1.5px solid var(--line);border-radius:7px;
+    font-size:13px;font-family:inherit;background:#fcfbf8;color:var(--ink);
+    min-width:120px;
+  }
+  .field input:focus, .field select:focus{outline:none;border-color:var(--moss);}
+  #toolbar button{
+    border:none;border-radius:8px;padding:9px 16px;
+    font-size:13px;font-weight:700;cursor:pointer;
+  }
+  #reload-btn{background:#eee9dd;color:#5d655a;}
+  #print-btn{background:var(--moss);color:#fff;}
+  #toolbar .spacer{flex:1;}
+  #status-line{font-size:12px;color:#6b7268;flex-basis:100%;}
+  #status-line.err{color:#b5462e;}
+
+  /* ---------- Lưới thẻ ---------- */
+  #grid-wrap{padding:22px;}
+  #tag-grid{
+    display:grid;
+    grid-template-columns:repeat(var(--cols), 1fr);
+    gap:14px;
+    max-width:1100px;
+    margin:0 auto;
+  }
+  .tag{
+    background:var(--panel);
+    border:1.5px dashed var(--line);
+    border-radius:12px;
+    padding:12px 10px 10px;
+    text-align:center;
+    display:flex;flex-direction:column;align-items:center;gap:5px;
+  }
+  .tag .qr-box{
+    background:#fff;padding:6px;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .tag .qr-box img, .tag .qr-box canvas{display:block;}
+  .tag .ma-cay{font-size:13px;font-weight:800;color:var(--moss-dark);letter-spacing:0.2px;}
+  .tag .loai-cay{font-size:11.5px;color:var(--ink);font-weight:600;}
+  .tag .vung{font-size:10px;color:#8b9186;}
+  .tag .hint{font-size:9px;color:#a8ad9f;margin-top:2px;}
+  .tag .brand-mark{
+    font-size:9.5px;font-weight:700;color:var(--moss);letter-spacing:0.4px;
+    text-transform:uppercase;margin-top:1px;
+  }
+
+  #empty, #loading{
+    max-width:1100px;margin:40px auto;text-align:center;
+    color:#6b7268;font-size:13px;
+  }
+
+  @media (max-width:900px){
+    #tag-grid{grid-template-columns:repeat(2,1fr);}
+  }
+
+  /* ---------- Chế độ in ---------- */
+  @media print{
+    #toolbar{display:none;}
+    #grid-wrap{padding:0;}
+    body{background:#fff;}
+    .tag{border:1px dashed #999;break-inside:avoid;page-break-inside:avoid;}
+    #tag-grid{gap:8px;max-width:none;}
+    @page{margin:10mm;}
+  }
+</style>
+</head>
+<body>
+
+  <div id="toolbar">
+    <h1>In QR code — Cây trồng
+      <span>Mỗi cây đã có toạ độ sẽ có 1 QR duy nhất, dẫn thẳng đến bản đồ đúng vị trí cây đó</span>
+    </h1>
+
+    <div class="field">
+      <label for="base-url-input">Địa chỉ web bản đồ</label>
+      <input type="text" id="base-url-input" style="min-width:280px">
+    </div>
+
+    <div class="field">
+      <label for="vung-filter">Vùng</label>
+      <select id="vung-filter"><option value="">Tất cả</option></select>
+    </div>
+
+    <div class="field">
+      <label for="cols-input">Số cột khi in</label>
+      <input type="number" id="cols-input" min="2" max="8" value="4" style="min-width:70px">
+    </div>
+
+    <div class="field">
+      <label for="qr-size-input">Kích thước QR (px)</label>
+      <input type="number" id="qr-size-input" min="80" max="300" step="10" value="140" style="min-width:80px">
+    </div>
+
+    <div class="spacer"></div>
+    <button id="reload-btn" type="button">↻ Tải lại dữ liệu</button>
+    <button id="print-btn" type="button">🖨️ In</button>
+
+    <div id="status-line">Đang tải dữ liệu…</div>
+  </div>
+
+  <div id="grid-wrap">
+    <div id="loading">Đang tải dữ liệu Cây trồng từ Google Sheets…</div>
+    <div id="empty" style="display:none">Không tìm thấy cây nào có toạ độ hợp lệ và Mã cây (cột ID) trong sheet.</div>
+    <div id="tag-grid"></div>
+  </div>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const els = {
+    baseUrl: document.getElementById("base-url-input"),
+    vungFilter: document.getElementById("vung-filter"),
+    cols: document.getElementById("cols-input"),
+    qrSize: document.getElementById("qr-size-input"),
+    reloadBtn: document.getElementById("reload-btn"),
+    printBtn: document.getElementById("print-btn"),
+    status: document.getElementById("status-line"),
+    grid: document.getElementById("tag-grid"),
+    loading: document.getElementById("loading"),
+    empty: document.getElementById("empty"),
+  };
+
+  let allRows = []; // toàn bộ dòng Cây trồng hợp lệ (có Lat/Lng + ID)
+
+  // Mặc định trỏ về index.html cùng thư mục với trang này
+  els.baseUrl.value = window.location.href.replace(/in-qr-cay\.html.*$/, "index.html");
+
+  // ---- CSV parsing (giống hệt app.js, để không phụ thuộc app.js) ----
+  function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let cell = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      const next = text[i + 1];
+      if (inQuotes) {
+        if (c === '"' && next === '"') { cell += '"'; i++; }
+        else if (c === '"') { inQuotes = false; }
+        else { cell += c; }
+      } else {
+        if (c === '"') { inQuotes = true; }
+        else if (c === ",") { row.push(cell); cell = ""; }
+        else if (c === "\n" || c === "\r") {
+          if (c === "\r" && next === "\n") i++;
+          row.push(cell); rows.push(row); row = []; cell = "";
+        } else { cell += c; }
+      }
+    }
+    if (cell.length > 0 || row.length > 0) { row.push(cell); rows.push(row); }
+    if (rows.length === 0) return [];
+    const headers = rows[0].map((h) => h.trim());
+    return rows.slice(1)
+      .filter((r) => r.some((v) => v && v.trim() !== ""))
+      .map((r) => {
+        const obj = {};
+        headers.forEach((h, idx) => { obj[h] = (r[idx] || "").trim(); });
+        return obj;
+      });
+  }
+
+  async function fetchCSV(url) {
+    const bust = (url.includes("?") ? "&" : "?") + "_=" + Date.now();
+    const res = await fetch(url + bust, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return parseCSV(await res.text());
+  }
+
+  function escapeHTML(str) {
+    if (!str) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function buildVungOptions(rows) {
+    const set = new Set();
+    rows.forEach((r) => { if (r.VungID) set.add(r.VungID); });
+    const sorted = Array.from(set).sort();
+    els.vungFilter.innerHTML = '<option value="">Tất cả (' + rows.length + ' cây)</option>' +
+      sorted.map((v) => {
+        const count = rows.filter((r) => r.VungID === v).length;
+        return `<option value="${escapeHTML(v)}">${escapeHTML(v)} (${count})</option>`;
+      }).join("");
+  }
+
+  function currentFilteredRows() {
+    const vung = els.vungFilter.value;
+    return vung ? allRows.filter((r) => r.VungID === vung) : allRows;
+  }
+
+  function renderGrid() {
+    const rows = currentFilteredRows();
+    const size = Math.max(80, Math.min(300, parseInt(els.qrSize.value, 10) || 140));
+    const cols = Math.max(2, Math.min(8, parseInt(els.cols.value, 10) || 4));
+    document.documentElement.style.setProperty("--cols", cols);
+
+    const base = (els.baseUrl.value || "").trim() || "index.html";
+
+    els.grid.innerHTML = "";
+    if (rows.length === 0) {
+      els.empty.style.display = "block";
+      return;
+    }
+    els.empty.style.display = "none";
+
+    rows.forEach((r) => {
+      const tag = document.createElement("div");
+      tag.className = "tag";
+
+      const qrBox = document.createElement("div");
+      qrBox.className = "qr-box";
+      tag.appendChild(qrBox);
+
+      const maCay = document.createElement("div");
+      maCay.className = "ma-cay";
+      maCay.textContent = "Mã cây: " + r.ID;
+      tag.appendChild(maCay);
+
+      if (r.LoaiCay) {
+        const loai = document.createElement("div");
+        loai.className = "loai-cay";
+        loai.textContent = r.LoaiCay;
+        tag.appendChild(loai);
+      }
+      if (r.VungID) {
+        const vung = document.createElement("div");
+        vung.className = "vung";
+        vung.textContent = "Vùng: " + r.VungID;
+        tag.appendChild(vung);
+      }
+
+      const hint = document.createElement("div");
+      hint.className = "hint";
+      hint.textContent = "Quét mã để xem thông tin cây";
+      tag.appendChild(hint);
+
+      const brand = document.createElement("div");
+      brand.className = "brand-mark";
+      brand.textContent = "CPART";
+      tag.appendChild(brand);
+
+      els.grid.appendChild(tag);
+
+      const targetUrl = base + (base.includes("?") ? "&" : "?") + "maCay=" + encodeURIComponent(r.ID);
+
+      if (window.QRCode) {
+        new QRCode(qrBox, {
+          text: targetUrl,
+          width: size,
+          height: size,
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+      } else {
+        qrBox.textContent = "Không tải được thư viện QR";
+      }
+    });
+  }
+
+  async function loadData() {
+    els.status.textContent = "Đang tải dữ liệu…";
+    els.status.classList.remove("err");
+    els.loading.style.display = "block";
+    els.grid.innerHTML = "";
+    els.empty.style.display = "none";
+    try {
+      const rows = await fetchCSV(MAP_CONFIG.CAYTRONG_CSV_URL);
+      allRows = rows.filter((r) => {
+        const active = (r.TrangThai || "").toLowerCase() !== "ẩn" && (r.TrangThai || "").toLowerCase() !== "an";
+        const lat = parseFloat(r.Lat);
+        const lng = parseFloat(r.Lng);
+        return active && r.ID && !isNaN(lat) && !isNaN(lng);
+      });
+      buildVungOptions(allRows);
+      els.loading.style.display = "none";
+      els.status.textContent = `Đã tải ${allRows.length} cây có toạ độ hợp lệ · Cập nhật lúc ` +
+        new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+      renderGrid();
+    } catch (err) {
+      console.error(err);
+      els.loading.style.display = "none";
+      els.status.textContent = "Lỗi tải dữ liệu: " + err.message;
+      els.status.classList.add("err");
+    }
+  }
+
+  els.reloadBtn.addEventListener("click", loadData);
+  els.printBtn.addEventListener("click", () => window.print());
+  els.vungFilter.addEventListener("change", renderGrid);
+  els.cols.addEventListener("change", renderGrid);
+  els.qrSize.addEventListener("change", renderGrid);
+  els.baseUrl.addEventListener("change", renderGrid);
+
+  loadData();
+})();
+</script>
+</body>
+</html>

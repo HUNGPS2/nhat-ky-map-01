@@ -23,12 +23,14 @@
     const lat = parseFloat(params.get("lat"));
     const lng = parseFloat(params.get("lng"));
     const zoom = parseInt(params.get("zoom"), 10);
+    const maCayParam = params.get("maCay"); // đến từ QR code gắn trên cây ngoài thực địa
     const validLatLng = !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
     const validZoom = !isNaN(zoom) && zoom >= 1 && zoom <= 22;
     return {
       center: validLatLng ? [lat, lng] : MAP_CONFIG.DEFAULT_CENTER,
       zoom: validZoom ? zoom : MAP_CONFIG.DEFAULT_ZOOM,
-      hasUrlView: validLatLng, // true = người dùng đã chỉ định tọa độ → không auto-fit
+      hasUrlView: validLatLng || !!maCayParam, // đã có view riêng (toạ độ hoặc mã cây) → không auto-fit
+      maCayParam,
     };
   }
 
@@ -90,6 +92,9 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
 
   // VungID -> { id, tenLop, imageUrl, thumbUrl, bounds: {north,south,east,west}, doPhanGiai }
   const orthoRegistry = new Map();
+
+  // Mã cây -> { row, latlng, layerName } — dùng để mở đúng cây khi quét QR code (?maCay=...)
+  const cayByMaCayRegistry = new Map();
 
   // ---------------------------------------------------------------
   // Basemap switcher (Bản đồ thường / Địa hình)
@@ -609,6 +614,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
 
   function renderCayTrong(rows) {
     cayTrongRowsCache = rows; // lưu lại để viewer Orthomosaic dùng, hiện đúng cây thuộc từng vùng
+    cayByMaCayRegistry.clear();
     rows
       .filter((r) => (r.TrangThai || "").toLowerCase() !== "ẩn" && (r.TrangThai || "").toLowerCase() !== "an")
       .forEach((r) => {
@@ -617,6 +623,9 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         if (isNaN(lat) || isNaN(lng)) return;
 
         const layerName = r.LopBanDo || "Cây trồng";
+        if (r.ID) {
+          cayByMaCayRegistry.set(String(r.ID), { row: r, latlng: [lat, lng], layerName });
+        }
         const treeColors = MAP_CONFIG.TREE_TYPE_COLORS || {};
         const color = treeColors[r.LoaiCay] || colorForLayer(layerName, "#7a9a3d");
         const entry = getOrCreateLayerEntry(layerName, "marker", color);
@@ -801,6 +810,10 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         els.emptyState.style.display = "none";
         setStatus("ok", `Cập nhật lúc ${formatTime(new Date())}`);
         if (isFirstLoad && !initialView.hasUrlView) fitToAllLayers();
+      }
+
+      if (isFirstLoad && initialView.maCayParam) {
+        openCayByMaCay(initialView.maCayParam);
       }
     } catch (err) {
       console.error(err);
@@ -1110,6 +1123,34 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   window.__clearCoordClickMarker = function () {
     if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
   };
+
+  // ---------------------------------------------------------------
+  // Mở đúng 1 cây theo Mã cây — dùng khi người dùng quét QR code gắn trên cây
+  // ngoài thực địa (URL dạng .../index.html?maCay=CAY001). Được gọi từ loadAll()
+  // sau khi tải xong dữ liệu lần đầu, và có thể gọi lại thủ công nếu cần.
+  // ---------------------------------------------------------------
+  function openCayByMaCay(maCay) {
+    const rec = cayByMaCayRegistry.get(String(maCay));
+    if (!rec) {
+      setStatus("err", `Không tìm thấy cây có mã "${maCay}"`);
+      return;
+    }
+    const popupHtml = buildCayTrongPopupHtml(rec.row, rec.layerName);
+    const targetZoom = Math.max(map.getZoom(), MAP_CONFIG.CAYTRONG_MIN_ZOOM || 17, 19);
+    map.flyTo(rec.latlng, targetZoom, { duration: 0.8 });
+    map.once("moveend", () => {
+      if (isMobileViewport()) {
+        openBottomSheet(popupHtml);
+      } else {
+        if (clickCoordMarker) { map.removeLayer(clickCoordMarker); clickCoordMarker = null; }
+        L.popup({ closeButton: true, maxWidth: 280 })
+          .setLatLng(rec.latlng)
+          .setContent(popupHtml)
+          .openOn(map);
+      }
+    });
+  }
+  window.__openCayByMaCay = openCayByMaCay;
 
   map.on("click", (e) => {
     if (isDrawToolActive) return; // đang vẽ/sửa/xoá lô đất — bỏ qua
