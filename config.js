@@ -33,7 +33,7 @@ const MAP_CONFIG = {
   //   TenThuocBVTV | LuongSuDung | NoiMua | ThoiGianCachLy_ngay | GhiChu | TrangThai
   // (ThoiGianCachLy_ngay nhập SỐ NGÀY thuần, ví dụ 14 — để app tự đếm ngược cảnh báo)
   // rồi Xuất bản lên web (Publish to web) tab này y như các tab khác, dán link vào đây.
-  NHATKY_CSV_URL: "DÁN_LINK_CSV_TAB_NHATKY_VÀO_ĐÂY",
+  NHATKY_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSIaaN5wcn5nbOeo6X1PImI4d9_wOBtvzk4nV9XWMmOvO-d3PeRO6GIaKbBMqzLplHnA8VNfHQMO9DM/pub?gid=1790948641&single=true&output=csv",
 
   
   // Tâm bản đồ mặc định và mức zoom ban đầu (giống bản mẫu: Ba Bể, Bắc Kạn)
