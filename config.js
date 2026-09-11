@@ -27,6 +27,14 @@ const MAP_CONFIG = {
    // Link CSV public của sheet Orthomosaic (ảnh chụp drone độ phân giải cao theo từng vùng)
   ORTHOMOSAIC_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSIaaN5wcn5nbOeo6X1PImI4d9_wOBtvzk4nV9XWMmOvO-d3PeRO6GIaKbBMqzLplHnA8VNfHQMO9DM/pub?gid=1036646683&single=true&output=csv",
 
+  // Link CSV public của sheet NhatKy (nhật ký canh tác — mỗi dòng gắn với 1 VungID).
+  // Cách lấy giống các sheet khác: tạo tab tên "NhatKy" với các cột:
+  //   VungID | NgayGhiNhan | GiaiDoanSinhTruong | CongViec | SinhVatGayHai |
+  //   TenThuocBVTV | LuongSuDung | NoiMua | ThoiGianCachLy_ngay | GhiChu | TrangThai
+  // (ThoiGianCachLy_ngay nhập SỐ NGÀY thuần, ví dụ 14 — để app tự đếm ngược cảnh báo)
+  // rồi Xuất bản lên web (Publish to web) tab này y như các tab khác, dán link vào đây.
+  NHATKY_CSV_URL: "DÁN_LINK_CSV_TAB_NHATKY_VÀO_ĐÂY",
+
   
   // Tâm bản đồ mặc định và mức zoom ban đầu (giống bản mẫu: Ba Bể, Bắc Kạn)
   DEFAULT_CENTER: [22.3488, 105.8244],

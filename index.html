@@ -346,6 +346,60 @@
     font-weight:400;color:#a8b39c;margin-left:4px;
   }
 
+  /* ---------- Nhật ký canh tác ---------- */
+  .nk-section{margin-top:10px;padding-top:10px;border-top:0.5px solid var(--line);}
+  .nk-head{font-size:12.5px;font-weight:700;color:var(--moss-dark);margin-bottom:8px;}
+  .nk-timeline{position:relative;padding-left:16px;}
+  .nk-timeline::before{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:1px;background:var(--line);}
+  .nk-item{position:relative;margin-bottom:12px;}
+  .nk-item::before{content:"";position:absolute;left:-16px;top:3px;width:7px;height:7px;border-radius:50%;background:var(--clay);}
+  .nk-item:last-child{margin-bottom:0;}
+  .nk-date{font-size:11.5px;font-weight:700;color:var(--ink);}
+  .nk-congviec{font-size:11px;color:#8b9186;margin-bottom:3px;}
+  .nk-detail{font-size:11.5px;color:#4b5247;line-height:1.5;}
+  .nk-more{margin-top:8px;padding-top:8px;border-top:0.5px dashed var(--line);text-align:center;
+    font-size:11.5px;font-weight:700;color:var(--moss-dark);cursor:pointer;}
+  .cachly-badge{display:inline-block;margin-top:5px;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;}
+  .cachly-warn{color:#854f0b;background:#faeeda;}
+  .cachly-ok{color:#27500a;background:#eaf3de;}
+
+  .nhatky-btn{
+    display:flex;align-items:center;gap:7px;
+    margin-top:10px;padding:9px 12px;
+    background:#f7f1e6;border:1.5px solid var(--clay);
+    border-radius:9px;cursor:pointer;
+    font-size:12.5px;font-weight:700;color:#8a4a13;
+    width:100%;
+    transition:background .15s;
+  }
+  .nhatky-btn:hover{background:#f0e6d3;}
+  .nhatky-ico{font-size:15px;}
+
+  /* ---------- Modal Nhật ký canh tác (toàn bộ danh sách của 1 Vùng) ---------- */
+  #nhatky-viewer{
+    position:fixed;inset:0;z-index:2800;
+    background:var(--panel);
+    display:none;flex-direction:column;
+  }
+  #nhatky-viewer.open{display:flex;}
+  #nhatky-viewer-header{
+    padding:14px 18px;background:#1c2418;color:#fff;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    flex-shrink:0;
+  }
+  #nhatky-viewer-header .nkv-title{font-size:14.5px;font-weight:700;}
+  #nhatky-viewer-close{
+    background:rgba(255,255,255,0.1);border:none;color:#fff;
+    width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  #nhatky-viewer-close:hover{background:rgba(255,255,255,0.2);}
+  #nhatky-viewer-body{
+    flex:1;overflow-y:auto;padding:18px 20px;
+    max-width:560px;margin:0 auto;width:100%;box-sizing:border-box;
+  }
+  #nhatky-viewer-body .nk-item::before{background:var(--clay);}
+
   /* ---------- Empty / error state ---------- */
   #empty-state{
     position:absolute;z-index:1000;left:50%;top:50%;transform:translate(-50%,-50%);
@@ -367,6 +421,8 @@
     #ortho-viewer-header{padding:10px 12px;gap:8px;}
     #ortho-viewer-header .ov-sub{display:none;}
     #ortho-opacity-control input[type="range"]{width:56px;}
+    #nhatky-viewer-header{padding:10px 12px;}
+    #nhatky-viewer-body{padding:14px 16px;}
   }
 
   .leaflet-control-zoom{margin-top:0 !important;}
@@ -592,6 +648,14 @@
     <div id="ortho-map"></div>
     <div id="ortho-zoom-indicator">Z—</div>
     <div id="ortho-viewer-hint">Kéo để di chuyển · Cuộn/chụm để zoom</div>
+  </div>
+
+  <div id="nhatky-viewer">
+    <div id="nhatky-viewer-header">
+      <div class="nkv-title" id="nhatky-viewer-title">Nhật ký canh tác</div>
+      <button id="nhatky-viewer-close" aria-label="Đóng">&times;</button>
+    </div>
+    <div id="nhatky-viewer-body"></div>
   </div>
 
   <div id="bottom-sheet-scrim"></div>

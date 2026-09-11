@@ -101,6 +101,9 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   // Mã cây -> { row, latlng, layerName } — dùng để mở đúng cây khi quét QR code (?maCay=...)
   const cayByMaCayRegistry = new Map();
 
+  // VungID -> [ { NgayGhiNhan, GiaiDoanSinhTruong, CongViec, ..., _ngayDate } ] — sắp xếp mới nhất trước
+  const nhatKyRegistry = new Map();
+
   // ---------------------------------------------------------------
   // Basemap switcher (Bản đồ thường / Địa hình)
   // ---------------------------------------------------------------
@@ -272,6 +275,58 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     const m = thumbnailUrl.match(/thumbnail\?id=([^&]+)/);
     if (!m) return null;
     return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  }
+
+  // ---------------------------------------------------------------
+  // Nhật ký canh tác — helpers ngày tháng + tính cảnh báo thời gian cách ly
+  // ---------------------------------------------------------------
+  // Parse "20/12/2025" hoặc "20-12-2025" -> Date. Trả về null nếu không hợp lệ.
+  function parseVNDate(str) {
+    if (!str) return null;
+    const parts = String(str).trim().split(/[\/\-]/);
+    if (parts.length !== 3) return null;
+    let [d, m, y] = parts.map((p) => parseInt(p, 10));
+    if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
+    if (y < 100) y += 2000;
+    const date = new Date(y, m - 1, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  // Số ngày đã trôi qua kể từ 1 mốc ngày (so theo ngày lịch, không tính giờ)
+  function daysSince(date) {
+    const now = new Date();
+    const a = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((b - a) / 86400000);
+  }
+
+  // Dựa vào NgayGhiNhan + ThoiGianCachLy_ngay để hiện badge còn cách ly hay đã an toàn
+  function buildCachLyBadgeHTML(entry) {
+    const cachLyNgay = parseInt(entry.ThoiGianCachLy_ngay, 10);
+    if (!entry._ngayDate || isNaN(cachLyNgay) || cachLyNgay <= 0) return "";
+    const remain = cachLyNgay - daysSince(entry._ngayDate);
+    if (remain > 0) {
+      return `<span class="cachly-badge cachly-warn">⏳ Còn ${remain} ngày cách ly</span>`;
+    }
+    return `<span class="cachly-badge cachly-ok">✅ Đã qua thời gian cách ly</span>`;
+  }
+
+  // Parse cột ThongSoRieng của Cây trồng: "Nhãn: Giá trị; Nhãn: Giá trị" -> mảng {label, value}
+  function parseKeyValueList(str) {
+    if (!str) return [];
+    return str.split(";").map((s) => s.trim()).filter(Boolean).map((pair) => {
+      const idx = pair.indexOf(":");
+      if (idx === -1) return { label: "", value: pair };
+      return { label: pair.slice(0, idx).trim(), value: pair.slice(idx + 1).trim() };
+    });
+  }
+
+  function buildThongSoRiengHTML(str) {
+    const items = parseKeyValueList(str);
+    if (items.length === 0) return "";
+    return items
+      .map((it) => `<div class="popup-row">${it.label ? `<b>${escapeHTML(it.label)}:</b> ` : ""}${escapeHTML(it.value)}</div>`)
+      .join("");
   }
 
   // ---------------------------------------------------------------
@@ -501,6 +556,86 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
     `;
   }
 
+  // ---------------------------------------------------------------
+  // Nhật ký canh tác — nạp registry theo VungID, dựng timeline HTML
+  // ---------------------------------------------------------------
+  function loadNhatKyRegistry(rows) {
+    nhatKyRegistry.clear();
+    rows
+      .filter((r) => (r.TrangThai || "").toLowerCase() !== "ẩn" && (r.TrangThai || "").toLowerCase() !== "an")
+      .forEach((r) => {
+        if (!r.VungID) return;
+        const entry = Object.assign({}, r, { _ngayDate: parseVNDate(r.NgayGhiNhan) });
+        if (!nhatKyRegistry.has(r.VungID)) nhatKyRegistry.set(r.VungID, []);
+        nhatKyRegistry.get(r.VungID).push(entry);
+      });
+    nhatKyRegistry.forEach((list) => {
+      list.sort((a, b) => (b._ngayDate ? b._ngayDate.getTime() : 0) - (a._ngayDate ? a._ngayDate.getTime() : 0));
+    });
+  }
+
+  function buildNhatKyEntryHTML(entry) {
+    const ngay = entry.NgayGhiNhan || "(chưa rõ ngày)";
+    const congViec = entry.CongViec ? escapeHTML(entry.CongViec) : "";
+    const lines = [];
+    if (entry.GiaiDoanSinhTruong) lines.push(`Giai đoạn: ${escapeHTML(entry.GiaiDoanSinhTruong)}`);
+    if (entry.SinhVatGayHai) lines.push(`Sinh vật gây hại: ${escapeHTML(entry.SinhVatGayHai)}`);
+    if (entry.TenThuocBVTV) lines.push(`${escapeHTML(entry.TenThuocBVTV)}${entry.LuongSuDung ? " · " + escapeHTML(entry.LuongSuDung) : ""}`);
+    if (entry.NoiMua) lines.push(`Nơi mua: ${escapeHTML(entry.NoiMua)}`);
+    if (entry.GhiChu) lines.push(escapeHTML(entry.GhiChu));
+    const badge = buildCachLyBadgeHTML(entry);
+    return `
+      <div class="nk-item">
+        <div class="nk-date">${escapeHTML(ngay)}</div>
+        ${congViec ? `<div class="nk-congviec">${congViec}</div>` : ""}
+        ${lines.length ? `<div class="nk-detail">${lines.join("<br>")}</div>` : ""}
+        ${badge}
+      </div>`;
+  }
+
+  // Dùng trong popup Vùng — hiện trực tiếp vài mục gần nhất + link mở toàn bộ
+  function buildNhatKySectionHTML(vungId, previewLimit) {
+    const list = nhatKyRegistry.get(vungId) || [];
+    if (list.length === 0) return "";
+    const shown = list.slice(0, previewLimit);
+    const moreHtml = list.length > previewLimit
+      ? `<div class="nk-more" onclick="window.__openNhatKyViewer('${escapeHTML(vungId)}')">Xem toàn bộ nhật ký (${list.length}) →</div>`
+      : "";
+    return `
+      <div class="nk-section">
+        <div class="nk-head">📋 Nhật ký canh tác · ${list.length} mục</div>
+        <div class="nk-timeline">${shown.map(buildNhatKyEntryHTML).join("")}</div>
+        ${moreHtml}
+      </div>`;
+  }
+
+  // Dùng trong popup Cây — chỉ 1 nút gọn, không lặp lại toàn bộ timeline của vùng trong từng cây
+  function buildNhatKyButtonHTML(vungId) {
+    const list = nhatKyRegistry.get(vungId) || [];
+    if (list.length === 0) return "";
+    return `
+      <button class="nhatky-btn" onclick="window.__openNhatKyViewer('${escapeHTML(vungId)}')">
+        <span class="nhatky-ico">📋</span>
+        <div><div>Nhật ký canh tác vùng</div>
+        <div style="font-size:10.5px;color:#8b9186;font-weight:400;margin-top:2px;">${list.length} mục · mới nhất: ${escapeHTML(list[0].NgayGhiNhan || "")}</div></div>
+      </button>`;
+  }
+
+  function openNhatKyViewer(vungId) {
+    const list = nhatKyRegistry.get(vungId) || [];
+    document.getElementById("nhatky-viewer-title").textContent = "Nhật ký canh tác — " + vungId;
+    document.getElementById("nhatky-viewer-body").innerHTML = list.length
+      ? list.map(buildNhatKyEntryHTML).join("")
+      : '<div style="padding:30px 16px;text-align:center;color:#8b9186;font-size:13px;">Chưa có nhật ký cho vùng này.</div>';
+    document.getElementById("nhatky-viewer").classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+  function closeNhatKyViewer() {
+    document.getElementById("nhatky-viewer").classList.remove("open");
+    document.body.style.overflow = "";
+  }
+  window.__openNhatKyViewer = openNhatKyViewer;
+
   function renderVungDienTich(rows) {
     rows
       .filter((r) => (r.TrangThai || "").toLowerCase() !== "ẩn" && (r.TrangThai || "").toLowerCase() !== "an")
@@ -544,6 +679,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         const videos = parseVideoList(r.VideoURLs || "");
         const videoHtml = buildVideoGalleryHTML(videos, "VT-" + (r.ID || layerName));
         const orthoHtml = buildOrthoButtonHTML(r.ID);
+        const nhatKyHtml = buildNhatKySectionHTML(r.ID, 2);
 
         const popupHtml = `
           <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
@@ -554,6 +690,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
           ${galleryHtml}
           ${videoHtml}
           ${orthoHtml}
+          ${nhatKyHtml}
         `;
 
         if (isMobileViewport()) {
@@ -596,11 +733,13 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
       ? `<div class="popup-row"><b>Nguồn dữ liệu:</b> ${escapeHTML(r.NguonDuLieu)}</div>`
       : "";
     const descHtml = r.GhiChu ? `<div class="popup-desc">${escapeHTML(r.GhiChu)}</div>` : "";
+    const thongSoHtml = buildThongSoRiengHTML(r.ThongSoRieng);
     const images = parseImageList(r.AnhURLs);
     const galleryHtml = buildGalleryHTML(images, "CT-" + (r.ID || layerName));
     const videos = parseVideoList(r.VideoURLs || "");
     const videoHtml = buildVideoGalleryHTML(videos, "CT-" + (r.ID || layerName));
     const orthoHtmlTree = buildOrthoButtonHTML(r.VungID);
+    const nhatKyBtnHtml = buildNhatKyButtonHTML(r.VungID);
 
     return `
       <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
@@ -610,10 +749,12 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
       ${ngayHtml}
       ${accHtml}
       ${nguonHtml}
+      ${thongSoHtml}
       ${descHtml}
       ${galleryHtml}
       ${videoHtml}
       ${orthoHtmlTree}
+      ${nhatKyBtnHtml}
     `;
   }
 
@@ -785,15 +926,17 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   async function loadAll(isFirstLoad) {
     setStatus("loading", "Đang tải dữ liệu…");
     try {
-      const [diaDiemRows, vungRows, cayRows, orthoRows] = await Promise.all([
+      const [diaDiemRows, vungRows, cayRows, orthoRows, nhatKyRows] = await Promise.all([
         fetchCSV(MAP_CONFIG.DIADIEM_CSV_URL).catch(() => []),
         fetchCSV(MAP_CONFIG.VUNGDIENTICH_CSV_URL).catch(() => []),
         fetchCSV(MAP_CONFIG.CAYTRONG_CSV_URL).catch(() => []),
         fetchCSV(MAP_CONFIG.ORTHOMOSAIC_CSV_URL).catch(() => []),
+        fetchCSV(MAP_CONFIG.NHATKY_CSV_URL).catch(() => []),
       ]);
 
-      // Nạp registry orthomosaic TRƯỚC khi vẽ popup, vì popup tra cứu registry này
+      // Nạp registry orthomosaic + nhật ký TRƯỚC khi vẽ popup, vì popup tra cứu 2 registry này
       loadOrthomosaicRegistry(orthoRows);
+      loadNhatKyRegistry(nhatKyRows);
 
       // Reset toàn bộ layer cũ trước khi vẽ lại
       layerRegistry.forEach((entry) => map.removeLayer(entry.group));
@@ -1398,6 +1541,20 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
   }
 
   orthoViewerClose.addEventListener("click", closeOrthoViewer);
+
+  // ---------------------------------------------------------------
+  // Modal Nhật ký canh tác — đóng bằng nút X, bấm ra ngoài, hoặc phím Esc
+  // ---------------------------------------------------------------
+  const nhatKyViewerEl = document.getElementById("nhatky-viewer");
+  document.getElementById("nhatky-viewer-close").addEventListener("click", closeNhatKyViewer);
+  nhatKyViewerEl.addEventListener("click", (e) => {
+    if (e.target === nhatKyViewerEl) closeNhatKyViewer();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && nhatKyViewerEl.classList.contains("open")) {
+      closeNhatKyViewer();
+    }
+  });
 
   if (orthoOpacitySlider) {
     orthoOpacitySlider.addEventListener("input", () => {
