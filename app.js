@@ -542,10 +542,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
       ? `<div style="font-size:10.5px;color:#7a9a3d;font-weight:400;margin-top:2px;">Zoom sâu đến từng cây</div>`
       : `<div style="font-size:10.5px;color:#8b9186;font-weight:400;margin-top:2px;">Ảnh tổng quan</div>`;
 
-    const thumbHtml = ortho.thumbUrl
-      ? `<img class="ortho-thumb-preview" src="${escapeHTML(ortho.thumbUrl)}" loading="lazy" alt=""
-             onclick="window.__openOrthoViewer('${escapeHTML(vungId)}')">`
-      : "";
+    const thumbHtml = "";
 
     return `
       ${thumbHtml}
