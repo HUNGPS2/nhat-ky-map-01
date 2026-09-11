@@ -681,13 +681,13 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
         const popupHtml = `
           <div class="popup-eyebrow">${escapeHTML(layerName)}</div>
           <div class="popup-title">${escapeHTML(r.TenVung || "(Chưa đặt tên)")}</div>
+          ${nhatKyHtml}
           ${areaHtml}
           ${cropHtml}
           ${descHtml}
           ${galleryHtml}
           ${videoHtml}
           ${orthoHtml}
-          ${nhatKyHtml}
         `;
 
         if (isMobileViewport()) {
@@ -743,6 +743,7 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
       <div class="popup-title">${escapeHTML(r.LoaiCay || "(Chưa rõ loại)")}</div>
       ${maCayHtml}
       ${vungHtml}
+      ${nhatKyBtnHtml}
       ${ngayHtml}
       ${accHtml}
       ${nguonHtml}
@@ -751,7 +752,6 @@ window.CPART_MAP = map;   // ← THÊM DÒNG NÀY để index.html truy cập đ
       ${galleryHtml}
       ${videoHtml}
       ${orthoHtmlTree}
-      ${nhatKyBtnHtml}
     `;
   }
 
